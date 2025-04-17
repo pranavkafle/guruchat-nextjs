@@ -1,36 +1,33 @@
-import mongoose, { Schema, Document, models, Model } from 'mongoose';
+import mongoose, { Document, Schema } from 'mongoose';
 
+// Interface representing a document in MongoDB.
 export interface IGuru extends Document {
   name: string;
-  description: string;
-  systemPrompt: string;
-  createdAt: Date;
-  updatedAt: Date;
+  description: string; // Maps from old 'personality'
+  systemPrompt: string; // Maps from old 'prompt'
 }
 
-const GuruSchema: Schema<IGuru> = new Schema(
-  {
-    name: {
-      type: String,
-      required: [true, 'Please provide a name for the Guru.'],
-      trim: true,
-    },
-    description: {
-      type: String,
-      required: [true, 'Please provide a description for the Guru.'],
-      trim: true,
-    },
-    systemPrompt: {
-      type: String,
-      required: [true, 'Please provide a system prompt for the Guru.'],
-      trim: true,
-    },
+// Schema corresponding to the document interface.
+const guruSchema: Schema<IGuru> = new Schema({
+  name: {
+    type: String,
+    required: [true, 'Please provide a name for the Guru.'],
+    trim: true,
   },
-  {
-    timestamps: true, // Adds createdAt and updatedAt timestamps
-  }
-);
+  description: {
+    type: String,
+    required: [true, 'Please provide a description for the Guru.'],
+    trim: true,
+  },
+  systemPrompt: {
+    type: String,
+    required: [true, 'Please provide a system prompt for the Guru.'],
+    trim: true,
+  },
+}, {
+  timestamps: true // Automatically add createdAt and updatedAt fields
+});
 
-const Guru: Model<IGuru> = models.Guru || mongoose.model<IGuru>('Guru', GuruSchema);
-
-export default Guru; 
+// Create and export the model
+// Avoids OverwriteModelError: Cannot overwrite `Guru` model once compiled.
+export default mongoose.models.Guru || mongoose.model<IGuru>('Guru', guruSchema);
