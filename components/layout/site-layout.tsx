@@ -1,17 +1,53 @@
-import React from 'react';
+'use client';
+
+import React, { useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
+import { Button } from '@/components/ui/button';
 
 interface SiteLayoutProps {
   children: React.ReactNode;
 }
 
 export function SiteLayout({ children }: SiteLayoutProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleLogout = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        router.push('/login');
+      } else {
+        console.error('Logout failed');
+      }
+    } catch (error) {
+      console.error('Logout request failed:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="flex min-h-screen flex-col">
-      {/* Placeholder for Header/Nav - We'll add later */}
+      {/* Placeholder for Header/Nav */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-14 items-center pl-6">
+        <div className="w-full flex h-14 items-center justify-between px-6"> 
           <span className="font-bold">GuruChat</span>
-          {/* Login/Logout buttons will go here later */}
+          {pathname !== '/login' && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleLogout}
+              disabled={isLoading}
+            >
+              {isLoading ? 'Logging out...' : 'Logout'}
+            </Button>
+          )}
         </div>
       </header>
 
