@@ -11,10 +11,6 @@ build
 .env*
 !.env.example
 
-# Test environment
-.env.test
-.env.*.local
-
 # Logs
 logs
 *.log
