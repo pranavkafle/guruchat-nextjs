@@ -71,18 +71,26 @@ export async function POST(req: NextRequest) {
       { expiresIn: '1d' } // Token expires in 1 day (adjust as needed)
     );
 
-    // Respond with the token - **Still returning token in body**
-    // Need to change this to set an HTTP-only cookie
-    return NextResponse.json({
+    // Create the response *without* the token in the body
+    const response = NextResponse.json({
       message: 'Login successful',
-      token: token,
-      // Optionally send back some non-sensitive user info
       user: {
         id: user.id,
         name: user.name,
         email: user.email,
       }
     }, { status: 200 });
+
+    // Set the JWT as an HTTP-only cookie
+    response.cookies.set('jwt_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: 60 * 60 * 24, // 1 day in seconds
+      sameSite: 'lax' 
+    });
+
+    return response; // Return the response with the cookie set
 
   } catch (error: any) {
     console.error('Login Error:', error);

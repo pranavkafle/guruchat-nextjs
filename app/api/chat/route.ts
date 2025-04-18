@@ -31,29 +31,40 @@ const googleProvider = createGoogleGenerativeAI({
 // Export named POST function
 export async function POST(req: NextRequest) {
   console.log('POST /api/chat hit');
+  
+  // Check if GOOGLE_API_KEY is missing (checked at module load, but double-check)
+  if (!GOOGLE_API_KEY) {
+    return NextResponse.json({ error: "Server configuration error: Missing AI API key" }, { status: 500 });
+  }
+  
   try {
-    // --- 1. Authentication ---
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.error('Missing or invalid Authorization header');
-      return NextResponse.json({ error: 'Unauthorized: Missing token' }, { status: 401 }); // Use NextResponse
+    // --- 1. Authentication (Read from Cookie) ---
+    const tokenCookie = req.cookies.get('jwt_token');
+    if (!tokenCookie) {
+      console.error('Missing jwt_token cookie');
+      return NextResponse.json({ error: 'Unauthorized: Missing token cookie' }, { status: 401 }); 
     }
-    const token = authHeader.split(' ')[1];
+    const token = tokenCookie.value;
+    
+    // const authHeader = req.headers.get('Authorization'); // Removed header check
+    // if (!authHeader || !authHeader.startsWith('Bearer ')) { ... }
+    // const token = authHeader.split(' ')[1]; // Removed header check
+    
     if (!JWT_SECRET) {
         console.error('JWT_SECRET is not defined');
-        return NextResponse.json({ error: 'Internal Server Error: JWT configuration missing' }, { status: 500 }); // Use NextResponse
+        return NextResponse.json({ error: 'Internal Server Error: JWT configuration missing' }, { status: 500 }); 
     }
     let decodedToken: any;
     try {
       decodedToken = jwt.verify(token, JWT_SECRET);
     } catch (error) {
       console.error('JWT verification failed:', error);
-      return NextResponse.json({ error: 'Unauthorized: Invalid token' }, { status: 401 }); // Use NextResponse
+      return NextResponse.json({ error: 'Unauthorized: Invalid token' }, { status: 401 }); 
     }
     const userId = decodedToken.userId;
     if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
          console.error('Invalid user ID in token:', userId);
-         return NextResponse.json({ error: 'Unauthorized: Invalid user ID in token' }, { status: 401 }); // Use NextResponse
+         return NextResponse.json({ error: 'Unauthorized: Invalid user ID in token' }, { status: 401 }); 
     }
     console.log('Authenticated user ID:', userId);
 
