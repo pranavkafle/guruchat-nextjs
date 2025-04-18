@@ -201,8 +201,8 @@ BAD_REG_STATUS=$(echo "$BAD_REG_RESPONSE" | tail -n1)
 BAD_REG_BODY=$(echo "$BAD_REG_RESPONSE" | sed '$d')
 check_success "$BAD_REG_STATUS" 400 "Registration with missing fields should fail with 400 (API validation)" "$BAD_REG_BODY"
 
-# --- Test 2: Registration (Successful or Conflict) ---
-print_test_header "[Public API] Registration (Expect 201 or 409)"
+# --- Test 2: Registration (Successful or Existing User) ---
+print_test_header "[Public API] Registration (Expect 201 Created or 400 Bad Request)"
 # Middleware should allow this to reach the API
 REG_PAYLOAD='{"name": "'"${TEST_NAME}"'", "email": "'"${TEST_EMAIL}"'", "password": "'"${TEST_PASSWORD}"'"}'
 REG_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${BASE_URL}/auth/register" \
@@ -211,12 +211,14 @@ REG_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${BASE_URL}/auth/register" \
 REG_STATUS=$(echo "$REG_RESPONSE" | tail -n1)
 REG_BODY=$(echo "$REG_RESPONSE" | sed '$d')
 
-if check_success_multi "$REG_STATUS" "201 409" "Registration request failed" "$REG_BODY"; then
+# Expect 201 (new user) or 400 (user already exists, from API)
+if check_success_multi "$REG_STATUS" "201 400" "Registration request failed" "$REG_BODY"; then
     # Additional checks based on status code
     if [ "$REG_STATUS" -eq 201 ]; then
-        check_json "$REG_BODY" '.userId' "Response contains userId"
-    elif [ "$REG_STATUS" -eq 409 ]; then
-        check_json "$REG_BODY" '.message | test("already exists")' "Conflict message contains 'already exists'"
+        # API returns success message, not userId
+        check_json "$REG_BODY" '.message == "User registered successfully"' "Success message is correct"
+    elif [ "$REG_STATUS" -eq 400 ]; then # Changed from 409 to 400
+        check_json "$REG_BODY" '.message | test("already exists")' "Error message contains 'already exists'"
     fi
 fi
 

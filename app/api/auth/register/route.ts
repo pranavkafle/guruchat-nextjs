@@ -9,39 +9,27 @@ import User from '@/lib/models/User';
 // Removed ResponseData type, NextResponse handles JSON structure
 
 // Define the POST handler using named export
-export async function POST(req: NextRequest) {
+export async function POST(request: Request) {
   // Ensure this route only accepts POST requests (implicit with named export)
   // No need for explicit method check if only POST is defined
 
-  let body;
-  try {
-      body = await req.json(); // Use req.json() for App Router
-  } catch (error) {
-      console.error('Failed to parse request body:', error);
-      return NextResponse.json({ message: 'Invalid JSON body' }, { status: 400 });
-  }
-  
-  const { name, email, password } = body;
-
-  // Basic input validation
-  if (!name || !email || !password) {
-    return NextResponse.json({ message: 'Missing required fields: name, email, password' }, { status: 400 });
-  }
-
-  // Add more robust email/password validation if needed
-
   try {
     await connectDB();
+    const { name, email, password } = await request.json();
+
+    // Basic validation
+    if (!name || !email || !password) {
+      return NextResponse.json({ message: 'Missing required fields' }, { status: 400 });
+    }
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return NextResponse.json({ message: 'User with this email already exists' }, { status: 409 }); // Use NextResponse
+      return NextResponse.json({ message: 'User with this email already exists' }, { status: 400 });
     }
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10); // Generate salt with 10 rounds
-    const hashedPassword = await bcrypt.hash(password, salt);
+    // Hash the password
+    const hashedPassword = await bcrypt.hash(password, 10); // Salt rounds = 10
 
     // Create new user
     const newUser = new User({
@@ -52,20 +40,15 @@ export async function POST(req: NextRequest) {
 
     await newUser.save();
 
-    // Respond with success (don't send back the password)
-    // Use NextResponse.json()
-    return NextResponse.json({
-      message: 'User registered successfully',
-      userId: newUser.id,
-    }, { status: 201 });
+    return NextResponse.json({ message: 'User registered successfully' }, { status: 201 });
 
-  } catch (error: any) {
-    console.error('Registration Error:', error);
-     // Handle Mongoose validation errors specifically if desired
-    if (error.name === 'ValidationError') {
-         return NextResponse.json({ message: 'Validation failed', error: error.message }, { status: 400 });
-    }
-    return NextResponse.json({ message: 'Internal Server Error', error: error.message }, { status: 500 });
+  } catch (error) {
+    console.error('[API Register Error]', error);
+    // Check if it's a validation error from Mongoose
+    if (error instanceof Error && error.name === 'ValidationError') {
+        return NextResponse.json({ message: 'Validation Error', errors: (error as any).errors }, { status: 400 });
+    }    
+    return NextResponse.json({ message: 'An internal server error occurred' }, { status: 500 });
   }
 }
 

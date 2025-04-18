@@ -38,7 +38,7 @@ export function SiteLayout({ children }: SiteLayoutProps) {
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="w-full flex h-14 items-center justify-between px-6"> 
           <span className="font-bold">GuruChat</span>
-          {pathname !== '/login' && (
+          {pathname !== '/login' && pathname !== '/register' && (
             <Button 
               variant="outline" 
               size="sm" 
