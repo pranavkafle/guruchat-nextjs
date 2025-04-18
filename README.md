@@ -74,6 +74,22 @@ A basic API test script is included to verify backend functionality.
     ```
     The script will test registration, login, fetching gurus, and initiating a chat stream. It checks HTTP status codes and basic response structures.
 
+## Middleware Configuration Notes
+
+*   **Authentication Enforcement:** The `middleware.ts` file handles authentication checks for accessing application routes.
+*   **Production Behavior:** In a production setting, unauthenticated users trying to access protected routes (like the main chat interface, assumed to be `/` or `/chat`) will be redirected to `/login`.
+*   **Development Convenience:** During frontend development (Milestone 7+), a temporary modification has been made to `middleware.ts` to allow unauthenticated access to the home page (`/`). This lets you work on the base page UI before the login flow is fully implemented.
+    *   **Code Snippet (Added for Dev):**
+        ```typescript
+        // In middleware.ts
+        const { pathname } = request.nextUrl;
+        if (pathname === '/') {
+          return NextResponse.next();
+        }
+        // ... rest of auth logic ...
+        ```
+*   **IMPORTANT (Before Production):** Before deploying to production or when testing the full authentication flow, **you must remove or comment out** the development convenience snippet mentioned above (`if (pathname === '/') ...`) to ensure the home page is properly protected by the authentication check.
+
 ## Deployment
 
 This project is configured for easy deployment on Vercel. Connect your Git repository (GitHub, GitLab, Bitbucket) to Vercel and ensure the necessary environment variables (`MONGODB_URI`, `JWT_SECRET`, `GOOGLE_AI_API_KEY`) are configured in the Vercel project settings. Vercel will automatically detect the Next.js framework and build/deploy the application. 

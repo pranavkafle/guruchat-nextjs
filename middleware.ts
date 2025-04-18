@@ -83,6 +83,11 @@ async function verifyToken(token: string): Promise<any> {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
+  // During development, allow access to home page
+  if (pathname === '/') {
+    return NextResponse.next();
+  }
+  
   // Get token from cookies 
   // **IMPORTANT**: Assumes login sets an httpOnly cookie named 'jwt_token'. 
   // Current implementation uses localStorage, which middleware CANNOT access.
