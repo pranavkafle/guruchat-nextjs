@@ -112,21 +112,60 @@ export async function POST(req: NextRequest) {
         console.error("Error during streamText execution:", error);
       },
       onFinish: async ({ text, toolCalls, toolResults, usage, finishReason, logprobs }) => {
-         // --- 7. Save Chat History ---
-         console.log('Gemini full response received (onFinish):', text);
+         // --- 7. Save/Update Chat History (Revised for Conversation Thread) ---
+         console.log('[Save History] Gemini full response received:', text);
          try {
-             console.log('Attempting to save chat history to DB...');
-             const newChat = new Chat({
-                 userId: new mongoose.Types.ObjectId(userId),
-                 userMessage: userMessageContent, 
-                 assistantMessage: text, 
-                 guruId: guruId && mongoose.Types.ObjectId.isValid(guruId) ? new mongoose.Types.ObjectId(guruId) : null,
-                 timestamp: new Date(),
-             });
-             await newChat.save();
-             console.log('Chat history saved successfully.');
+             const lastUserMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+             if (!lastUserMessage || lastUserMessage.role !== 'user') {
+                 console.error('[Save History] Could not find last user message.');
+                 return;
+             }
+
+             const validGuruId = guruId && mongoose.Types.ObjectId.isValid(guruId) 
+                                 ? new mongoose.Types.ObjectId(guruId) 
+                                 : null; // Use null if invalid/missing
+
+             if (!validGuruId) {
+                 console.error('[Save History] Cannot save chat without a valid guruId.');
+                 // Decide if you want to allow chats without a guru - currently skipping save
+                 return; 
+             }
+             
+             const userObjectId = new mongoose.Types.ObjectId(userId);
+
+             // --- Log values before update --- 
+             console.log(`[Save History] Attempting findOneAndUpdate with:`);
+             console.log(`[Save History] userId: ${userObjectId}`);
+             console.log(`[Save History] guruId: ${validGuruId}`);
+             const messagesToAppend = [
+                 { role: 'user', content: lastUserMessage.content },
+                 { role: 'assistant', content: text }
+             ];
+             console.log(`[Save History] messagesToAppend:`, JSON.stringify(messagesToAppend));
+             // --- End Logging ---
+
+             // Find the conversation for this user/guru and append messages, or create if not found
+             const updatedChat = await Chat.findOneAndUpdate(
+                 { userId: userObjectId, guruId: validGuruId }, // Filter to find the specific conversation thread
+                 { 
+                     $push: { messages: { $each: messagesToAppend } }, // Append the new messages
+                     $setOnInsert: { userId: userObjectId, guruId: validGuruId } // Set IDs only on initial creation
+                 },
+                 { 
+                     upsert: true, // Create the document if it doesn't exist
+                     new: true, // Return the modified document (or new one)
+                     sort: { createdAt: -1 } // Ensure if multiple somehow exist, we update the latest (though filter should prevent this)
+                 } 
+             );
+
+             if (updatedChat) {
+                 console.log(`[Save History] Chat history ${updatedChat._id} updated/created successfully.`);
+             } else {
+                 console.error('[Save History] findOneAndUpdate did not return a document.');
+             }
+
          } catch (dbError) {
-             console.error('DATABASE ERROR in onFinish callback:', dbError);
+             console.error('[Save History] DATABASE ERROR during findOneAndUpdate:', dbError);
          }
       },
     });

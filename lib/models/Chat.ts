@@ -7,6 +7,7 @@ interface IMessage {
 
 export interface IChat extends Document {
   userId: Types.ObjectId;
+  guruId?: Types.ObjectId;
   messages: IMessage[];
   createdAt: Date;
   updatedAt: Date;
@@ -34,6 +35,12 @@ const ChatSchema: Schema<IChat> = new Schema(
       ref: 'User', // Reference to the User model
       required: true,
       index: true, // Index for faster lookups by userId
+    },
+    guruId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Guru', // Reference to the Guru model
+      required: false, // Make it optional initially, depends on if every chat *must* have a guru
+      index: true, 
     },
     messages: {
       type: [MessageSchema],
