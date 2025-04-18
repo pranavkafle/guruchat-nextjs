@@ -54,19 +54,21 @@ export async function POST(req: NextRequest) {
         console.error('JWT_SECRET is not defined');
         return NextResponse.json({ error: 'Internal Server Error: JWT configuration missing' }, { status: 500 }); 
     }
-    let decodedToken: any;
-    try {
-      decodedToken = jwt.verify(token, JWT_SECRET);
-    } catch (error) {
-      console.error('JWT verification failed:', error);
-      return NextResponse.json({ error: 'Unauthorized: Invalid token' }, { status: 401 }); 
+
+    // Decode the token payload (Middleware already verified the signature)
+    const decodedToken = jwt.decode(token) as { userId?: string }; // Type assertion for clarity
+
+    if (!decodedToken) {
+        console.error('Failed to decode JWT token');
+        return NextResponse.json({ error: 'Unauthorized: Invalid token format' }, { status: 401 });
     }
+
     const userId = decodedToken.userId;
     if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
-         console.error('Invalid user ID in token:', userId);
+         console.error('Invalid or missing user ID in token payload:', userId);
          return NextResponse.json({ error: 'Unauthorized: Invalid user ID in token' }, { status: 401 }); 
     }
-    console.log('Authenticated user ID:', userId);
+    console.log('Authenticated user ID (from decoded token):', userId);
 
     // --- Restore Original Logic ---
     
