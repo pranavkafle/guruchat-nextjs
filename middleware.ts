@@ -82,11 +82,8 @@ async function verifyToken(token: string): Promise<any> {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  
-  // During development, allow access to home page
-  if (pathname === '/') {
-    return NextResponse.next();
-  }
+  console.log(`[Middleware] Pathname: ${pathname}`); // Log requested path
+  console.log(`[Middleware] Method: ${request.method}`); // Log request method
   
   // Get token from cookies 
   // **IMPORTANT**: Assumes login sets an httpOnly cookie named 'jwt_token'. 
@@ -113,12 +110,21 @@ export async function middleware(request: NextRequest) {
   }
 
   // If user is NOT authenticated
-  // If trying to access an auth page, allow access
-  if (isAuthPage) {
+  const isLoginPage = pathname.startsWith('/login');
+  const isRegisterPage = pathname.startsWith('/register');
+  const isLoginApi = pathname.startsWith('/api/auth/login');
+  const isRegisterApi = pathname.startsWith('/api/auth/register');
+
+  console.log(`[Middleware] Unauthenticated. Path: ${pathname}. isLoginApi=${isLoginApi}, isRegisterApi=${isRegisterApi}`);
+
+  // Allow access to login/register pages and their corresponding API endpoints
+  if (isLoginPage || isRegisterPage || isLoginApi || isRegisterApi) {
+    console.log('[Middleware] Allowing access to public auth page or API route.');
     return NextResponse.next();
   }
   
-  // If trying to access a protected page, redirect to login
+  // For all other routes, redirect unauthenticated users to the login page
+  console.log(`[Middleware] Unauthenticated user on protected route (${pathname}). Redirecting to /login`);
   return NextResponse.redirect(new URL('/login', request.url));
 }
 
@@ -132,7 +138,9 @@ export const config = {
      * - favicon.ico (favicon file)
      * -images (image files)
      */
-    '/((?!_next/static|_next/image|favicon.ico|images).*)\'',
+    '/api/(.*)', // Try regex equivalent for API routes
+    // Match page routes, excluding the specific assets/folders
+    '/((?!_next/static|_next/image|favicon.ico|images).*)', 
     // Match the root path explicitly if needed
     '/', // Ensure root path is explicitly matched
   ],

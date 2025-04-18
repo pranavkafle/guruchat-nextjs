@@ -12,9 +12,10 @@ export async function GET(
   req: NextRequest, 
   context: { params: { id: string } } // Use standard context object name
 ) {
-  // Properly await the context and params
-  const { params } = context;
-  const id = params.id; // Extract id directly from params
+  // Await the context or params if necessary (based on error message)
+  // Although usually synchronous, let's try awaiting for safety
+  const { params } = await Promise.resolve(context); 
+  const { id } = params; // Extract id from the resolved params object
 
   // Validate ObjectId
   if (!mongoose.Types.ObjectId.isValid(id)) {
