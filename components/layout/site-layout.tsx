@@ -9,14 +9,14 @@ export function SiteLayout({ children }: SiteLayoutProps) {
     <div className="flex min-h-screen flex-col">
       {/* Placeholder for Header/Nav - We'll add later */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-14 items-center">
-          <span>GuruChat Nav Placeholder</span>
+        <div className="container flex h-14 items-center pl-6">
+          <span className="font-bold">GuruChat</span>
           {/* Login/Logout buttons will go here later */}
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="flex-1 container py-6">
+      {/* Main Content Area - Center its content */}
+      <main className="flex flex-1 items-center justify-center">
          {children}
       </main>
 
