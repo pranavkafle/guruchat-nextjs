@@ -1,0 +1,38 @@
+# Dependencies
+node_modules
+.pnp.*
+
+# Build output
+dist
+build
+.next
+
+# Environment variables
+.env*
+!.env.example
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Vercel
+.vercel
+
+# Editor directories and files
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Ignore old app reference folder
+old-app/ 
