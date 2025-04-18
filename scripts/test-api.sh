@@ -17,12 +17,13 @@ TEST_PASSWORD="password123"
 TEST_NAME="API Test User"
 COOKIE_JAR=$(mktemp) # Create a temporary file for cookies
 GURU_ID="" # Will be populated later
+CONVERSATION_ID="" # Add variable for conversation ID
 
 # --- Counters and Colors ---
 PASS_COUNT=0
 FAIL_COUNT=0
 TEST_INDEX=0
-TOTAL_TESTS=11 # Adjusted to reflect 11 distinct test blocks
+TOTAL_TESTS=17 # Increased total tests by 6
 
 COLOR_RESET='\033[0m'
 COLOR_GREEN='\033[0;32m'
@@ -294,7 +295,6 @@ INVALID_GURU_BODY=$(echo "$INVALID_GURU_RESPONSE" | sed '$d')
 check_success "$INVALID_GURU_STATUS" 400 "Fetch with invalid Guru ID should fail with 400" "$INVALID_GURU_BODY"
 
 # --- Test 8: Chat Endpoint (Authenticated) ---
-# Note: Renumbered from original Test 9 to keep auth tests together
 print_test_header "[Auth API] Chat Endpoint (Expect 200 Stream Start)"
 # Middleware should allow authenticated request
 if [ -z "$GURU_ID" ]; then
@@ -311,8 +311,57 @@ else
     check_success "$CHAT_STATUS" 200 "Authenticated chat request failed (check Vercel dev logs for stream errors)" ""
 fi
 
-# --- Test 9: Logout ---
-# Note: Renumbered from original Test 10
+# --- Test 9: Fetch Chat History Summary (Authenticated) ---
+print_test_header "[Auth API] Fetch Chat History Summary (Expect 200)"
+HISTORY_SUMMARY_RESPONSE=$(curl -s -w "\n%{http_code}" -b "$COOKIE_JAR" -X GET "${BASE_URL}/chats")
+HISTORY_SUMMARY_STATUS=$(echo "$HISTORY_SUMMARY_RESPONSE" | tail -n1)
+HISTORY_SUMMARY_BODY=$(echo "$HISTORY_SUMMARY_RESPONSE" | sed '$d')
+
+if check_success "$HISTORY_SUMMARY_STATUS" 200 "Fetch chat history summary failed" "$HISTORY_SUMMARY_BODY"; then
+    if check_json "$HISTORY_SUMMARY_BODY" '(.success == true) and (.data | type == "array")' "Response format valid (success=true, data=array)"; then
+        # Try to extract a conversation ID from the first conversation of the first guru (if available)
+        CONVERSATION_ID=$(echo "$HISTORY_SUMMARY_BODY" | jq -r '.data[0].conversations[0].conversationId // ""')
+        if [ -z "$CONVERSATION_ID" ]; then
+            echo "    ${COLOR_YELLOW}Warning: Could not extract a conversation ID from history summary (history might be empty). Subsequent tests may skip.${COLOR_RESET}"
+        else
+            echo "    Extracted Conversation ID: ${CONVERSATION_ID}"
+        fi
+    fi
+fi
+
+# --- Test 10: Fetch Specific Conversation (Authenticated) ---
+print_test_header "[Auth API] Fetch Specific Conversation (Expect 200)"
+if [ -z "$CONVERSATION_ID" ]; then
+    echo "  ${COLOR_YELLOW}SKIPPING - Conversation ID not available from previous test.${COLOR_RESET}"
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+else
+    SPECIFIC_CHAT_RESPONSE=$(curl -s -w "\n%{http_code}" -b "$COOKIE_JAR" -X GET "${BASE_URL}/chats?conversationId=${CONVERSATION_ID}")
+    SPECIFIC_CHAT_STATUS=$(echo "$SPECIFIC_CHAT_RESPONSE" | tail -n1)
+    SPECIFIC_CHAT_BODY=$(echo "$SPECIFIC_CHAT_RESPONSE" | sed '$d')
+
+    if check_success "$SPECIFIC_CHAT_STATUS" 200 "Fetch specific conversation failed" "$SPECIFIC_CHAT_BODY"; then
+        if check_json "$SPECIFIC_CHAT_BODY" '(.success == true) and (.data | type == "object")' "Response format valid (success=true, data=object)"; then
+             check_json "$SPECIFIC_CHAT_BODY" '(.data._id == $CONVO_ID) and (.data.messages | type == "array" and length > 0)' "Data has correct ID and non-empty messages array" --arg CONVO_ID "$CONVERSATION_ID"
+        fi
+    fi
+fi
+
+# --- Test 11: Fetch Conversation with Invalid ID Format (Expect 400) ---
+print_test_header "[Auth API] Fetch Conversation with Invalid ID Format (Expect 400)"
+INVALID_CONVO_RESPONSE=$(curl -s -w "\n%{http_code}" -b "$COOKIE_JAR" -X GET "${BASE_URL}/chats?conversationId=invalid-format")
+INVALID_CONVO_STATUS=$(echo "$INVALID_CONVO_RESPONSE" | tail -n1)
+INVALID_CONVO_BODY=$(echo "$INVALID_CONVO_RESPONSE" | sed '$d')
+check_success "$INVALID_CONVO_STATUS" 400 "Fetch with invalid Conversation ID should fail with 400" "$INVALID_CONVO_BODY"
+
+# --- Test 12: Fetch Conversation with Non-Existent ID (Expect 404) ---
+print_test_header "[Auth API] Fetch Conversation with Non-Existent ID (Expect 404)"
+NONEXISTENT_ID="605c72ef1f1b2b001c8e4d49" # A plausible but likely non-existent ObjectId
+NONEXISTENT_CONVO_RESPONSE=$(curl -s -w "\n%{http_code}" -b "$COOKIE_JAR" -X GET "${BASE_URL}/chats?conversationId=${NONEXISTENT_ID}")
+NONEXISTENT_CONVO_STATUS=$(echo "$NONEXISTENT_CONVO_RESPONSE" | tail -n1)
+NONEXISTENT_CONVO_BODY=$(echo "$NONEXISTENT_CONVO_RESPONSE" | sed '$d')
+check_success "$NONEXISTENT_CONVO_STATUS" 404 "Fetch with non-existent Conversation ID should fail with 404" "$NONEXISTENT_CONVO_BODY"
+
+# --- Test 13: Logout ---
 print_test_header "[Auth API] Logout (Expect 200)"
 # Middleware should allow authenticated request
 LOGOUT_RESPONSE=$(curl -s -w "\n%{http_code}" -I \
@@ -339,7 +388,7 @@ fi
 
 echo -e "\n${COLOR_YELLOW}--- Category: Middleware Tests (Incorrect Auth) ---${COLOR_RESET}"
 
-# --- Test 10: Chat Endpoint without Authentication ---
+# --- Test 14: Chat Endpoint without Authentication ---
 print_test_header "[Middleware NoAuth] Chat Endpoint (Expect 307 Redirect)"
 # Middleware should intercept and redirect
 CHAT_PAYLOAD='{"messages": [{"role": "user", "content": "Hello again!" }], "guruId": "'"${GURU_ID}"'"}'
@@ -349,7 +398,7 @@ UNAUTH_CHAT_STATUS=$(curl -s --no-buffer -w "%{http_code}" -o /dev/null -X POST 
 # This test should expect 307 because middleware redirects unauthenticated protected API requests
 check_success "$UNAUTH_CHAT_STATUS" 307 "Chat request without auth cookie should be redirected (307) by middleware" ""
 
-# --- Test 11: Access Protected Route After Logout ---
+# --- Test 15: Access Protected Route After Logout ---
 print_test_header "[Middleware NoAuth] Fetch Gurus after Logout (Expect 307 Redirect)"
 # Middleware should intercept and redirect
 POST_LOGOUT_RESPONSE=$(curl -s -w "\n%{http_code}" -b "$COOKIE_JAR" -X GET "${BASE_URL}/gurus")
@@ -357,6 +406,22 @@ POST_LOGOUT_STATUS=$(echo "$POST_LOGOUT_RESPONSE" | tail -n1)
 POST_LOGOUT_BODY=$(echo "$POST_LOGOUT_RESPONSE" | sed '$d')
 check_success "$POST_LOGOUT_STATUS" 307 "Fetch gurus after logout should redirect (307) due to middleware" "$POST_LOGOUT_BODY"
 
+# --- Test 16: Fetch Chat History Summary without Authentication ---
+print_test_header "[Middleware NoAuth] Fetch Chat History Summary (Expect 307 Redirect)"
+UNAUTH_HISTORY_SUMMARY_RESPONSE=$(curl -s -w "\n%{http_code}" -X GET "${BASE_URL}/chats")
+UNAUTH_HISTORY_SUMMARY_STATUS=$(echo "$UNAUTH_HISTORY_SUMMARY_RESPONSE" | tail -n1)
+check_success "$UNAUTH_HISTORY_SUMMARY_STATUS" 307 "Fetch history summary without auth cookie should be redirected (307)" ""
+
+# --- Test 17: Fetch Specific Conversation without Authentication ---
+print_test_header "[Middleware NoAuth] Fetch Specific Conversation (Expect 307 Redirect)"
+if [ -z "$CONVERSATION_ID" ]; then
+    echo "  ${COLOR_YELLOW}SKIPPING - Conversation ID not available from previous tests.${COLOR_RESET}"
+    FAIL_COUNT=$((FAIL_COUNT + 1))
+else
+    UNAUTH_SPECIFIC_CHAT_RESPONSE=$(curl -s -w "\n%{http_code}" -X GET "${BASE_URL}/chats?conversationId=${CONVERSATION_ID}")
+    UNAUTH_SPECIFIC_CHAT_STATUS=$(echo "$UNAUTH_SPECIFIC_CHAT_RESPONSE" | tail -n1)
+    check_success "$UNAUTH_SPECIFIC_CHAT_STATUS" 307 "Fetch specific conversation without auth cookie should be redirected (307)" ""
+fi
 
 # --- Test Summary ---
 echo -e "\n${COLOR_BLUE}--- Test Summary ---${COLOR_RESET}"
