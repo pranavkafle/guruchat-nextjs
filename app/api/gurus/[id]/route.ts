@@ -10,12 +10,10 @@ import mongoose from 'mongoose';
 // The second argument provides access to route parameters (like `id`)
 export async function GET(
   req: NextRequest, 
-  context: { params: { id: string } } // Use standard context object name
+  { params }: { params: Promise<{ id: string }> } // Correct type for Next.js 15
 ) {
-  // Await the context or params if necessary (based on error message)
-  // Although usually synchronous, let's try awaiting for safety
-  const { params } = await Promise.resolve(context); 
-  const { id } = params; // Extract id from the resolved params object
+  // Await the params Promise to get the id
+  const { id } = await params; 
 
   // Validate ObjectId
   if (!mongoose.Types.ObjectId.isValid(id)) {
