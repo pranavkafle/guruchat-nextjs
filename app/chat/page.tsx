@@ -59,7 +59,7 @@ function ChatInterface() {
 
     // --- Chat Hook (Declare BEFORE effects that use its return values) ---
     const { messages, input, handleInputChange, handleSubmit, isLoading: isLoadingChat, error: errorChat } = useChat({
-        key: conversationId || guruIdFromUrl, 
+        key: (conversationId || guruIdFromUrl) ?? undefined, 
         api: '/api/chat',
         body: {
             guruId: selectedGuru?._id ? selectedGuru._id : undefined, 
