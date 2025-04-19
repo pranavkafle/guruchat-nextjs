@@ -341,6 +341,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               <Collapsible
                 key={guruHistory.guruId}
                 className="group/collapsible"
+                defaultOpen={true}
               >
                 <SidebarMenuItem>
                   <CollapsibleTrigger asChild>

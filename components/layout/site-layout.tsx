@@ -1,8 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { AppSidebar } from '@/components/app-sidebar';
+import { SidebarProvider } from "@/components/ui/sidebar";
 
 interface SiteLayoutProps {
   children: React.ReactNode;
@@ -32,13 +35,19 @@ export function SiteLayout({ children }: SiteLayoutProps) {
     }
   };
 
+  const showSidebar = pathname !== '/login' && pathname !== '/register';
+
   return (
     <div className="flex min-h-screen flex-col">
-      {/* Placeholder for Header/Nav */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="w-full flex h-14 items-center justify-between px-6"> 
-          <span className="font-bold">GuruChat</span>
-          {pathname !== '/login' && (
+        <div className="w-full flex h-14 items-center justify-between px-6">
+          <Link href="/" className="font-bold">
+            GuruChat
+          </Link>
+          {!showSidebar && (
+             null // Or perhaps login/register links if desired
+          )}
+          {showSidebar && (
             <Button 
               variant="outline" 
               size="sm" 
@@ -51,12 +60,16 @@ export function SiteLayout({ children }: SiteLayoutProps) {
         </div>
       </header>
 
-      {/* Main Content Area - Center its content */}
-      <main className="flex flex-1 items-center justify-center">
-         {children}
-      </main>
-
-      {/* Footer removed */}
+      <SidebarProvider>
+        <div className="flex flex-1">
+          {showSidebar && (
+            <AppSidebar className="sticky top-[56px] h-[calc(100vh-56px)]" /> // Added sticky positioning
+          )}
+          <main className="flex flex-1 flex-col items-stretch justify-start p-4 md:p-6"> {/* Reverted main styling */}
+             {children}
+          </main>
+        </div>
+      </SidebarProvider>
     </div>
   );
 } 
