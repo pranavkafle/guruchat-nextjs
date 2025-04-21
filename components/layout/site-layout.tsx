@@ -11,6 +11,9 @@ interface SiteLayoutProps {
   children: React.ReactNode;
 }
 
+// Define header height as a CSS variable value
+const headerHeight = '3.5rem'; // Corresponds to h-14
+
 export function SiteLayout({ children }: SiteLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -38,9 +41,12 @@ export function SiteLayout({ children }: SiteLayoutProps) {
   const showSidebar = pathname !== '/login' && pathname !== '/register';
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="w-full flex h-14 items-center justify-between px-6">
+    <div 
+      className="flex h-full flex-col"
+      style={{ '--header-height': headerHeight } as React.CSSProperties} // Define CSS variable
+    >
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 h-[var(--header-height)] shrink-0"> {/* Use variable for height and add shrink-0 */}
+        <div className="w-full flex items-center justify-between px-6 h-full"> {/* Ensure inner div uses full header height */}
           <Link href="/" className="font-bold">
             GuruChat
           </Link>
@@ -61,11 +67,17 @@ export function SiteLayout({ children }: SiteLayoutProps) {
       </header>
 
       <SidebarProvider>
-        <div className="flex flex-1">
+        <div className="flex flex-1 overflow-hidden">
           {showSidebar && (
-            <AppSidebar className="sticky top-[56px] h-[calc(100vh-56px)]" /> // Added sticky positioning
+            // Use CSS variable for top offset and height calculation
+            <AppSidebar className="top-[var(--header-height)] h-[calc(100vh-var(--header-height))]" /> 
           )}
-          <main className="flex flex-1 flex-col items-stretch justify-start p-4 md:p-6"> {/* Reverted main styling */}
+          {/* Main content area with specific overflow handling based on path */}
+          <main className={`flex flex-1 ${
+            showSidebar 
+              ? 'flex-col items-stretch justify-start overflow-auto' 
+              : 'items-center justify-center overflow-hidden h-[calc(100vh-var(--header-height))]'
+            } px-4 md:px-6 py-0`}>
              {children}
           </main>
         </div>
