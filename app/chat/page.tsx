@@ -204,11 +204,11 @@ function ChatInterface() {
 
     // --- Render Chat Interface ---
     return (
-        <div className="container mx-auto p-4 flex flex-col flex-grow">
-            {/* Chat Interface Container - This should grow and handle internal overflow */}
-            <div className="flex flex-col flex-grow border rounded-lg shadow-md overflow-hidden"> 
+        <div className="flex flex-col h-[calc(100vh-var(--header-height))]">
+            {/* Chat Interface Container - Full height minus header */}
+            <div className="flex flex-col h-full border rounded-lg shadow-md overflow-hidden m-4"> 
                 {/* Chat Header */}
-                 <div className="p-4 border-b bg-muted/40 flex items-center justify-between">
+                 <div className="p-4 border-b bg-muted/40 flex items-center justify-between shrink-0">
                     <div className='flex items-center space-x-3'>
                          <Avatar className="h-8 w-8">
                              <AvatarImage src={getGuruImagePath(selectedGuru.name)} alt={selectedGuru.name} className="object-cover" />
@@ -222,8 +222,8 @@ function ChatInterface() {
                      </Button>
                  </div>
 
-                {/* Messages Area - Should grow to fill space */}
-                <ScrollArea className="flex-grow p-4 bg-background" id="message-scroll-area">
+                {/* Messages Area - Scrollable area that takes available space */}
+                <ScrollArea className="flex-grow overflow-auto p-4 bg-background" id="message-scroll-area">
                      <div className="space-y-4">
                         {messages.map((m) => (
                             <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -268,7 +268,7 @@ function ChatInterface() {
                 </ScrollArea>
 
                 {/* Input Area */}
-                <div className="p-4 border-t bg-muted/40">
+                <div className="p-4 border-t bg-muted/40 shrink-0">
                     {errorChat && (
                          <Alert variant="destructive" className="mb-2">
                              <AlertTitle>Chat Error</AlertTitle>
