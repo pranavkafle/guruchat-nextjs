@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import '@/lib/models/Guru'; // Import Guru model for side effects (registration)
 
 // Retrieve the MongoDB connection string from environment variables
 const MONGODB_URI = process.env.MONGODB_URI;
