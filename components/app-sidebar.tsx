@@ -297,8 +297,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <GalleryVerticalEnd className="size-4" />
                 </div>
                 <div className="flex flex-col gap-0.5 leading-none">
-                  <span className="font-medium">GuruChat</span>
-                  <span className="">Chat History</span>
+                  <span className="font-medium">Chat History</span>
+                  <span className="">History</span>
                 </div>
               </Link>
             </SidebarMenuButton>
