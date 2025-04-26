@@ -36,19 +36,32 @@ export function LoginForm({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ email, password }),
+        // Default redirect: 'follow' is usually fine, fetch handles 3xx automatically
       });
 
-      if (response.ok) {
-        router.push('/');
-      } else {
-        const data = await response.json();
-        setError(data.message || 'Login failed. Please try again.');
-      }
+      // If the response is NOT ok (e.g., 401, 400, 500), handle the error.
+      // If it IS ok (likely 200 from the page '/' AFTER the redirect), 
+      // the browser has already navigated, so we don't need to do anything here.
+      if (!response.ok) {
+        // Attempt to parse error json only if not ok
+        try {
+            const data = await response.json();
+            setError(data.message || 'Login failed. Please check your credentials.');
+        } catch (jsonError) {
+            // Handle cases where the error response isn't valid JSON
+            setError(`Login failed. Status: ${response.status}`);
+        }
+      } 
+      // No 'else' block needed for client-side navigation on success
+      // If response.ok is true, the browser followed the redirect and landed on '/'
+
     } catch (err) {
+      // Catches network errors or other issues with the fetch itself
       console.error('Login fetch error:', err);
-      setError('An unexpected error occurred. Please try again.');
+      setError('An unexpected network error occurred. Please try again.');
     } finally {
-      setIsLoading(false);
+      // Stop loading indicator regardless of success or failure
+      setIsLoading(false); 
     }
   };
 
