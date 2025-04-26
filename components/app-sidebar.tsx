@@ -197,6 +197,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const [history, setHistory] = useState<GuruHistory[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(true);
   const [errorHistory, setErrorHistory] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState<string>(''); // Add state for search term
 
   // --- Fetch Gurus ---
   useEffect(() => {
@@ -257,6 +258,24 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     fetchHistory();
   }, []); // Run once on mount
 
+  // Handle search input change
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(event.target.value);
+  };
+
+  // Filter history based on search term
+  const filteredHistory = history.map(guruHistory => ({
+    ...guruHistory,
+    conversations: guruHistory.conversations.filter(chat => 
+      chat.summary.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      guruHistory.guruName.toLowerCase().includes(searchTerm.toLowerCase()) // Also search guru name
+    )
+  })).filter(guruHistory => guruHistory.conversations.length > 0); // Only show gurus with matching chats
+
+  // Determine if there are any results after filtering
+  const hasSearchResults = filteredHistory.length > 0;
+  const isSearching = searchTerm !== '';
+
   // Function to navigate to a specific chat conversation
   const handleChatLinkClick = (guruId: string, conversationId: string) => {
       if (!conversationId || conversationId === 'unknown') {
@@ -278,14 +297,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   <GalleryVerticalEnd className="size-4" />
                 </div>
                 <div className="flex flex-col gap-0.5 leading-none">
-                  <span className="font-medium">GuruChat</span>
-                  <span className="">History</span>
+                  <span className="font-medium">Chat History</span>
                 </div>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-        <SearchForm />
+        {/* Pass value and onChange to SearchForm */}
+        <SearchForm value={searchTerm} onChange={handleSearchChange} />
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
@@ -337,45 +356,80 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                  </div>
             )}
             {/* Display History grouped by Guru */}
-            {!isLoadingHistory && !errorHistory && history.map((guruHistory) => (
-              <Collapsible
-                key={guruHistory.guruId}
-                className="group/collapsible"
-                defaultOpen={true}
-              >
-                <SidebarMenuItem>
-                  <CollapsibleTrigger asChild>
-                    <SidebarMenuButton>
-                       <MessageSquareText className="size-4 mr-2" />
-                      {guruHistory.guruName}
-                      <Plus className="ml-auto group-data-[state=open]/collapsible:hidden" />
-                      <Minus className="ml-auto group-data-[state=closed]/collapsible:hidden" />
-                    </SidebarMenuButton>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <SidebarMenuSub>
-                        {/* Display chat summaries (conversations) for this guru */}
-                        {guruHistory.conversations.length === 0 && (
-                             <SidebarMenuSubItem>
-                                <span className="text-muted-foreground text-xs px-2 py-1">No chats with this guru yet.</span>
-                             </SidebarMenuSubItem>
-                        )}
-                         {guruHistory.conversations.map((convoSummary) => (
-                           <SidebarMenuSubItem key={convoSummary.conversationId}>
-                             <button
-                               // Pass guruId and conversationId to the handler
-                               onClick={() => handleChatLinkClick(guruHistory.guruId, convoSummary.conversationId)}
-                               className="flex items-center w-full h-auto px-2 py-1.5 text-left text-xs rounded-md hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
-                             >
-                               {convoSummary.summary} 
-                             </button>
-                           </SidebarMenuSubItem>
-                         ))}
-                    </SidebarMenuSub>
-                  </CollapsibleContent>
+            {isLoadingHistory ? (
+              // Show skeletons while loading history
+              Array.from({ length: 3 }).map((_, index) => (
+                <SidebarMenuItem key={`skel-guru-${index}`}>
+                  <SidebarMenuButton className="opacity-50">
+                    <Plus className="size-4 mr-2" />
+                    <Skeleton className="h-4 w-20" />
+                  </SidebarMenuButton>
+                  <SidebarMenuSub>
+                    {Array.from({ length: 2 }).map((_, subIndex) => (
+                      <SidebarMenuSubItem key={`skel-chat-${index}-${subIndex}`}>
+                         <Skeleton className="h-5 w-full" />
+                      </SidebarMenuSubItem>
+                    ))}
+                  </SidebarMenuSub>
                 </SidebarMenuItem>
-              </Collapsible>
-            ))}
+              ))
+            ) : errorHistory ? (
+              <Alert variant="destructive" className="m-2">
+                <AlertTitle>Error Loading History</AlertTitle>
+                <AlertDescription>{errorHistory}</AlertDescription>
+              </Alert>
+            ) : hasSearchResults ? (
+              // Use filteredHistory here
+              filteredHistory.map((guruHistory) => (
+                <Collapsible
+                  key={guruHistory.guruId}
+                  className="group/collapsible"
+                  defaultOpen={true}
+                >
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton>
+                         <MessageSquareText className="size-4 mr-2" />
+                        {guruHistory.guruName}
+                        <Plus className="ml-auto group-data-[state=open]/collapsible:hidden" />
+                        <Minus className="ml-auto group-data-[state=closed]/collapsible:hidden" />
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                          {/* Display chat summaries (conversations) for this guru */}
+                          {guruHistory.conversations.length === 0 && (
+                               <SidebarMenuSubItem>
+                                  <span className="text-muted-foreground text-xs px-2 py-1">No chats with this guru yet.</span>
+                               </SidebarMenuSubItem>
+                          )}
+                           {guruHistory.conversations.map((convoSummary) => (
+                             <SidebarMenuSubItem key={convoSummary.conversationId}>
+                               <button
+                                 // Pass guruId and conversationId to the handler
+                                 onClick={() => handleChatLinkClick(guruHistory.guruId, convoSummary.conversationId)}
+                                 className="flex items-center w-full h-auto px-2 py-1.5 text-left text-xs rounded-md hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                               >
+                                 {convoSummary.summary} 
+                               </button>
+                             </SidebarMenuSubItem>
+                           ))}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              ))
+            ) : isSearching ? (
+              // Show message when search yields no results
+              <SidebarMenuItem>
+                <span className="text-muted-foreground text-sm px-2 py-1">No results found.</span>
+              </SidebarMenuItem>
+            ) : (
+               // Show message when history is empty (and not searching)
+              <SidebarMenuItem>
+                <span className="text-muted-foreground text-sm px-2 py-1">No chat history yet.</span>
+              </SidebarMenuItem>
+            )}
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
