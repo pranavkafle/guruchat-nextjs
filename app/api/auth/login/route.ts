@@ -71,15 +71,17 @@ export async function POST(req: NextRequest) {
       { expiresIn: '1d' } // Token expires in 1 day (adjust as needed)
     );
 
-    // Construct the redirect URL relative to the request
-    const redirectUrl = new URL('/', req.url);
+    // Create the response *without* the token in the body
+    const response = NextResponse.json({
+      message: 'Login successful',
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+      }
+    }, { status: 200 });
 
-    // Create the redirect response
-    const response = NextResponse.redirect(redirectUrl, {
-      status: 303, // 303 See Other: Standard practice after POST to redirect to GET
-    });
-
-    // Set the JWT as an HTTP-only cookie on the redirect response
+    // Set the JWT as an HTTP-only cookie
     response.cookies.set('jwt_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -88,7 +90,7 @@ export async function POST(req: NextRequest) {
       sameSite: 'lax' 
     });
 
-    return response; // Return the redirect response with the cookie set
+    return response; // Return the response with the cookie set
 
   } catch (error: any) {
     console.error('Login Error:', error);

@@ -36,13 +36,14 @@ export function LoginForm({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ email, password }),
-        // Default redirect: 'follow' is usually fine, fetch handles 3xx automatically
       });
 
-      // If the response is NOT ok (e.g., 401, 400, 500), handle the error.
-      // If it IS ok (likely 200 from the page '/' AFTER the redirect), 
-      // the browser has already navigated, so we don't need to do anything here.
-      if (!response.ok) {
+      if (response.ok) {
+        // Client-side redirect after successful login
+        router.push('/'); 
+        // Refresh data to ensure middleware runs with the new cookie
+        router.refresh(); 
+      } else {
         // Attempt to parse error json only if not ok
         try {
             const data = await response.json();
@@ -52,8 +53,6 @@ export function LoginForm({
             setError(`Login failed. Status: ${response.status}`);
         }
       } 
-      // No 'else' block needed for client-side navigation on success
-      // If response.ok is true, the browser followed the redirect and landed on '/'
 
     } catch (err) {
       // Catches network errors or other issues with the fetch itself
