@@ -39,16 +39,28 @@ export function LoginForm({
       });
 
       if (response.ok) {
-        router.push('/');
+        // Client-side redirect after successful login
+        router.push('/'); 
+        // Refresh data to ensure middleware runs with the new cookie
+        router.refresh(); 
       } else {
-        const data = await response.json();
-        setError(data.message || 'Login failed. Please try again.');
-      }
+        // Attempt to parse error json only if not ok
+        try {
+            const data = await response.json();
+            setError(data.message || 'Login failed. Please check your credentials.');
+        } catch (jsonError) {
+            // Handle cases where the error response isn't valid JSON
+            setError(`Login failed. Status: ${response.status}`);
+        }
+      } 
+
     } catch (err) {
+      // Catches network errors or other issues with the fetch itself
       console.error('Login fetch error:', err);
-      setError('An unexpected error occurred. Please try again.');
+      setError('An unexpected network error occurred. Please try again.');
     } finally {
-      setIsLoading(false);
+      // Stop loading indicator regardless of success or failure
+      setIsLoading(false); 
     }
   };
 
