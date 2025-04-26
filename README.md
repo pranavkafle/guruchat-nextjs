@@ -33,18 +33,19 @@ Before you begin, ensure you have the following installed:
 3.  **Configure Environment Variables:**
     Create a `.env.local` file in the root directory of the project. Add the following variables, replacing the placeholder values with your actual credentials:
     ```dotenv
-    MONGODB_URI=your_mongodb_connection_string # e.g., mongodb+srv://user:pass@cluster.mongodb.net/dbname
+    MONGODB_URI=your_mongodb_connection_string # e.g., mongodb+srv://user:pass@cluster.mongodb.net/guruchat
     JWT_SECRET=your_strong_jwt_secret          # A secure random string for signing tokens
     GOOGLE_AI_API_KEY=your_google_ai_api_key   # Your API key from Google AI Studio
     ```
+    *   Make sure your `MONGODB_URI` points to the desired database (e.g., `guruchat`).
     *   **Security Note:** Ensure `JWT_SECRET` is a strong, unique, and secret key. Do not commit the `.env.local` file to version control (it's included in `.gitignore`).
 
-4.  **Seed the Database:**
-    Run the seed script to populate the database with sample Guru data.
+4.  **Seed the Database (if necessary):**
+    This step populates the database with the default Guru personas defined in `scripts/seedGurus.ts`. Run this command if your `gurus` collection is empty or if you are setting up the application for the first time.
     ```bash
     pnpm run seed:gurus
     ```
-    You should see output indicating successful connection and insertion of gurus.
+    *   **Note:** If your database already contains Guru data, running this script might not be necessary and could potentially lead to duplicate entries or errors if the script isn't designed to handle existing data. Check the script's logic if unsure.
 
 5.  **Run the Development Server:**
     Start the Next.js development server using Vercel CLI.
@@ -76,19 +77,10 @@ A basic API test script is included to verify backend functionality.
 
 ## Middleware Configuration Notes
 
-*   **Authentication Enforcement:** The `middleware.ts` file handles authentication checks for accessing application routes.
-*   **Production Behavior:** In a production setting, unauthenticated users trying to access protected routes (like the main chat interface, assumed to be `/` or `/chat`) will be redirected to `/login`.
-*   **Development Convenience:** During frontend development (Milestone 7+), a temporary modification has been made to `middleware.ts` to allow unauthenticated access to the home page (`/`). This lets you work on the base page UI before the login flow is fully implemented.
-    *   **Code Snippet (Added for Dev):**
-        ```typescript
-        // In middleware.ts
-        const { pathname } = request.nextUrl;
-        if (pathname === '/') {
-          return NextResponse.next();
-        }
-        // ... rest of auth logic ...
-        ```
-*   **IMPORTANT (Before Production):** Before deploying to production or when testing the full authentication flow, **you must remove or comment out** the development convenience snippet mentioned above (`if (pathname === '/') ...`) to ensure the home page is properly protected by the authentication check.
+*   **Authentication Enforcement:** The `middleware.ts` file handles authentication checks for accessing application routes. It verifies a `jwt_token` cookie (which should be set via HttpOnly during login).
+*   **Behavior:**
+    *   Authenticated users attempting to access `/login` or `/register` are redirected to the homepage (`/`).
+    *   Unauthenticated users attempting to access any protected route (including `/`) are redirected to `/login`. Access is allowed only to the `/login`, `/register` pages and their corresponding API endpoints (`/api/auth/login`, `/api/auth/register`).
 
 ## Deployment
 
