@@ -298,7 +298,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 </div>
                 <div className="flex flex-col gap-0.5 leading-none">
                   <span className="font-medium">GuruChat</span>
-                  <span className="">History</span>
+                  <span className="">Chat History</span>
                 </div>
               </Link>
             </SidebarMenuButton>
