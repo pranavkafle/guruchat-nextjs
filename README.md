@@ -1,10 +1,10 @@
-# GuruChat - MERN Stack Migration
+# GuruChat - Next.js Full-Stack Application
 
-This repository contains the migrated version of the GuruChat application, implemented using the MERN stack (MongoDB, Express.js - via Next.js API Routes, React - via Next.js, Node.js) and designed for deployment on Vercel.
+This repository contains the Next.js version of the GuruChat application, implemented using the MNT stack (MongoDB, Next.js, TypeScript) and designed for deployment on Vercel.
 
 ## Overview
 
-The application allows users to register, log in, and chat with different "Guru" personas powered by Google's Generative AI. The backend uses Next.js API routes and leverages MongoDB for data storage.
+The application allows users to register, log in, and chat with different "Guru" personas powered by Google's Generative AI. Built as a full-stack Next.js application with API routes for the backend and React components for the frontend, leveraging MongoDB for data storage.
 
 ## Prerequisites
 
@@ -21,7 +21,7 @@ Before you begin, ensure you have the following installed:
 1.  **Clone the Repository:**
     ```bash
     git clone <repository-url> # Replace <repository-url> with the actual URL
-    cd guruchat-mern # Or your repository directory name
+    cd guruchat-nextjs # Or your repository directory name
     ```
 
 2.  **Install Dependencies:**
