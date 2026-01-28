@@ -39,3 +39,4 @@ old-app/
 
 # Ignore PR/issue description helper files
 body.md 
+.env*.local

@@ -98,13 +98,13 @@ export async function POST(req: NextRequest) {
          console.log('No Guru ID provided. Using default system prompt.');
     }
     // --- 5. Call AI using Vercel AI SDK streamText ---
-    console.log('Calling streamText with model:', 'models/gemini-2.0-flash');
+    console.log('Calling streamText with model:', 'models/gemini-2.5-flash');
     console.log('System Prompt:', systemPrompt);
     console.log('Messages:', JSON.stringify(messages, null, 2)); // Log the messages being sent
 
     const result = await streamText({
       // Use the custom provider instance
-      model: googleProvider('models/gemini-2.0-flash'), 
+      model: googleProvider('models/gemini-2.5-flash'), 
       messages: messages, 
       system: systemPrompt,
       // Add onError callback for detailed logging
