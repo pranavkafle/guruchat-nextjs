@@ -5,6 +5,8 @@ import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useChat, Message } from 'ai/react';
 import mongoose from 'mongoose';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 // Shadcn UI Imports
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,7 +30,7 @@ interface ConversationData {
     _id: string; // Conversation ID
     userId: string; // or Types.ObjectId if needed
     guruId: Guru; // The populated guru object
-    messages: Message[]; 
+    messages: Message[];
     createdAt: string;
     updatedAt: string;
 }
@@ -52,17 +54,17 @@ function ChatInterface() {
     const conversationId = searchParams.get('chatId');
 
     const [selectedGuru, setSelectedGuru] = useState<Guru | null>(null);
-    const [initialMessages, setInitialMessages] = useState<Message[]>([]); 
+    const [initialMessages, setInitialMessages] = useState<Message[]>([]);
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
 
     // --- Chat Hook (Declare BEFORE effects that use its return values) ---
     const { messages, input, handleInputChange, handleSubmit, isLoading: isLoadingChat, error: errorChat } = useChat({
-        key: (conversationId || guruIdFromUrl) ?? undefined, 
+        key: (conversationId || guruIdFromUrl) ?? undefined,
         api: '/api/chat',
         body: {
-            guruId: selectedGuru?._id ? selectedGuru._id : undefined, 
+            guruId: selectedGuru?._id ? selectedGuru._id : undefined,
         },
         initialMessages: initialMessages,
         onError: (err) => {
@@ -96,7 +98,7 @@ function ChatInterface() {
                 const response = await fetch(url);
                 if (!response.ok) {
                     let errorMsg = `Failed to fetch initial data: ${response.statusText}`;
-                    try { const errBody = await response.json(); errorMsg = errBody.message || errorMsg; } catch (e) {}
+                    try { const errBody = await response.json(); errorMsg = errBody.message || errorMsg; } catch (e) { }
                     throw new Error(errorMsg);
                 }
                 const data = await response.json();
@@ -107,7 +109,7 @@ function ChatInterface() {
                 if (isFetchingConversation) {
                     const convoData = data.data as ConversationData;
                     // Use the populated guruId object directly
-                    if (!convoData.guruId || !convoData.guruId._id) { 
+                    if (!convoData.guruId || !convoData.guruId._id) {
                         throw new Error('Conversation data missing populated Guru details.');
                     }
                     setSelectedGuru(convoData.guruId); // Set the full guru object
@@ -128,7 +130,7 @@ function ChatInterface() {
 
         fetchInitialData();
         // Depend on IDs from URL. Note: useSearchParams values are reactive.
-    }, [conversationId, guruIdFromUrl]); 
+    }, [conversationId, guruIdFromUrl]);
 
     // --- Refocus Input Effect ---
     useEffect(() => {
@@ -136,7 +138,7 @@ function ChatInterface() {
         if (input === '' && !isLoadingChat && !isLoading) {
             inputRef.current?.focus();
         }
-    }, [input, isLoadingChat, isLoading]); 
+    }, [input, isLoadingChat, isLoading]);
 
     // --- Initial Focus Effect ---
     useEffect(() => {
@@ -144,7 +146,7 @@ function ChatInterface() {
         if (!isLoading && selectedGuru) {
             inputRef.current?.focus();
         }
-    }, [isLoading, selectedGuru]); 
+    }, [isLoading, selectedGuru]);
 
     // Custom submit handler
     const handleChatSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -194,37 +196,37 @@ function ChatInterface() {
 
     // If guru not found after loading (should be caught by error state, but as fallback)
     if (!selectedGuru) {
-         return (
-             <div className="container mx-auto p-4 flex flex-col h-screen items-center justify-center">
-                 <p>Guru not found.</p>
-                 <Button onClick={() => router.push('/')}>Go Back</Button>
-             </div>
-         );
+        return (
+            <div className="container mx-auto p-4 flex flex-col h-screen items-center justify-center">
+                <p>Guru not found.</p>
+                <Button onClick={() => router.push('/')}>Go Back</Button>
+            </div>
+        );
     }
 
     // --- Render Chat Interface ---
     return (
         <div className="flex flex-col h-[calc(100vh-var(--header-height))]">
             {/* Chat Interface Container - Full height minus header */}
-            <div className="flex flex-col h-full border rounded-lg shadow-md overflow-hidden m-4"> 
+            <div className="flex flex-col h-full border rounded-lg shadow-md overflow-hidden m-4">
                 {/* Chat Header */}
-                 <div className="p-4 border-b bg-muted/40 flex items-center justify-between shrink-0">
+                <div className="p-4 border-b bg-muted/40 flex items-center justify-between shrink-0">
                     <div className='flex items-center space-x-3'>
-                         <Avatar className="h-8 w-8">
-                             <AvatarImage src={getGuruImagePath(selectedGuru.name)} alt={selectedGuru.name} className="object-cover" />
-                             <AvatarFallback>{selectedGuru.name.substring(0, 1)}</AvatarFallback>
-                         </Avatar>
-                         <h2 className="text-xl font-semibold">{selectedGuru.name}</h2>
+                        <Avatar className="h-8 w-8">
+                            <AvatarImage src={getGuruImagePath(selectedGuru.name)} alt={selectedGuru.name} className="object-cover" />
+                            <AvatarFallback>{selectedGuru.name.substring(0, 1)}</AvatarFallback>
+                        </Avatar>
+                        <h2 className="text-xl font-semibold">{selectedGuru.name}</h2>
                     </div>
                     {/* Changed button to go back to home/guru selection */}
-                     <Button variant="outline" size="sm" onClick={() => router.push('/')}>
-                         Change Guru
-                     </Button>
-                 </div>
+                    <Button variant="outline" size="sm" onClick={() => router.push('/')}>
+                        Change Guru
+                    </Button>
+                </div>
 
                 {/* Messages Area - Scrollable area that takes available space */}
                 <ScrollArea className="flex-grow overflow-auto p-4 bg-background" id="message-scroll-area">
-                     <div className="space-y-4">
+                    <div className="space-y-4">
                         {messages.map((m) => (
                             <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                 <div className={`flex items-end max-w-xs md:max-w-md lg:max-w-lg ${m.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -237,29 +239,49 @@ function ChatInterface() {
                                         ) : (
                                             <>
                                                 <AvatarImage src="/images/user-avatar.png" alt="User" />
-                                                <AvatarFallback>You</AvatarFallback> 
+                                                <AvatarFallback>You</AvatarFallback>
                                             </>
                                         )}
                                     </Avatar>
                                     <div
-                                        className={`px-3 py-2 rounded-lg shadow-sm ${
-                                            m.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'
-                                        }`}
+                                        className={`px-3 py-2 rounded-lg shadow-sm ${m.role === 'user'
+                                                ? 'bg-primary text-primary-foreground'
+                                                : 'bg-muted prose prose-sm dark:prose-invert max-w-none'
+                                            }`}
                                     >
-                                         <p className="text-sm whitespace-pre-wrap">{m.content}</p>
+                                        {m.role === 'user' ? (
+                                            <p className="text-sm whitespace-pre-wrap">{m.content}</p>
+                                        ) : (
+                                            <ReactMarkdown
+                                                remarkPlugins={[remarkGfm]}
+                                                components={{
+                                                    // Customize markdown elements to match your design system
+                                                    p: ({ children }) => <p className="text-sm mb-2 last:mb-0">{children}</p>,
+                                                    ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
+                                                    ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
+                                                    li: ({ children }) => <li className="mb-1">{children}</li>,
+                                                    h1: ({ children }) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
+                                                    h2: ({ children }) => <h2 className="text-md font-bold mb-2">{children}</h2>,
+                                                    code: ({ children }) => <code className="bg-muted-foreground/20 rounded px-1 text-xs">{children}</code>,
+                                                    pre: ({ children }) => <pre className="bg-muted-foreground/10 rounded p-2 overflow-x-auto my-2">{children}</pre>,
+                                                }}
+                                            >
+                                                {m.content}
+                                            </ReactMarkdown>
+                                        )}
                                     </div>
                                 </div>
                             </div>
                         ))}
-                         {isLoadingChat && messages.length > 0 && messages[messages.length-1].role === 'user' && (
+                        {isLoadingChat && messages.length > 0 && messages[messages.length - 1].role === 'user' && (
                             <div className="flex justify-start">
                                 <div className="flex items-end max-w-xs md:max-w-md lg:max-w-lg flex-row">
-                                     <Avatar className={`h-6 w-6 mr-2`}>
-                                         <AvatarImage src={getGuruImagePath(selectedGuru.name)} alt={selectedGuru.name} className="object-cover" />
-                                         <AvatarFallback>{selectedGuru.name.substring(0, 1)}</AvatarFallback>
-                                     </Avatar>
+                                    <Avatar className={`h-6 w-6 mr-2`}>
+                                        <AvatarImage src={getGuruImagePath(selectedGuru.name)} alt={selectedGuru.name} className="object-cover" />
+                                        <AvatarFallback>{selectedGuru.name.substring(0, 1)}</AvatarFallback>
+                                    </Avatar>
                                     <div className="px-3 py-2 rounded-lg bg-muted flex items-center">
-                                         <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                                     </div>
                                 </div>
                             </div>
@@ -270,11 +292,11 @@ function ChatInterface() {
                 {/* Input Area */}
                 <div className="p-4 border-t bg-muted/40 shrink-0">
                     {errorChat && (
-                         <Alert variant="destructive" className="mb-2">
-                             <AlertTitle>Chat Error</AlertTitle>
-                             <AlertDescription>{errorChat.message || 'An error occurred.'}</AlertDescription>
-                         </Alert>
-                     )}
+                        <Alert variant="destructive" className="mb-2">
+                            <AlertTitle>Chat Error</AlertTitle>
+                            <AlertDescription>{errorChat.message || 'An error occurred.'}</AlertDescription>
+                        </Alert>
+                    )}
                     <form onSubmit={handleChatSubmit} className="flex items-center space-x-2">
                         <Textarea
                             ref={inputRef}
@@ -286,8 +308,8 @@ function ChatInterface() {
                             rows={1}
                             disabled={isLoading || isLoadingChat}
                         />
-                        <Button 
-                            type="submit" 
+                        <Button
+                            type="submit"
                             size="sm"
                             disabled={isLoading || isLoadingChat || !input.trim()}
                         >
