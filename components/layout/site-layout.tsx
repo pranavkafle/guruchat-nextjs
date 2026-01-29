@@ -5,14 +5,12 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { AppSidebar } from '@/components/app-sidebar';
-import { SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { Separator } from "@/components/ui/separator";
 
 interface SiteLayoutProps {
   children: React.ReactNode;
 }
-
-// Define header height as a CSS variable value
-const headerHeight = '3.5rem'; // Corresponds to h-14
 
 export function SiteLayout({ children }: SiteLayoutProps) {
   const router = useRouter();
@@ -40,48 +38,58 @@ export function SiteLayout({ children }: SiteLayoutProps) {
 
   const showSidebar = pathname !== '/login' && pathname !== '/register';
 
-  return (
-    <div 
-      className="flex h-full flex-col"
-      style={{ '--header-height': headerHeight } as React.CSSProperties} // Define CSS variable
-    >
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 h-[var(--header-height)] shrink-0"> {/* Use variable for height and add shrink-0 */}
-        <div className="w-full flex items-center justify-between px-6 h-full"> {/* Ensure inner div uses full header height */}
-          <Link href="/" className="font-bold">
-            GuruChat
-          </Link>
-          {!showSidebar && (
-             null // Or perhaps login/register links if desired
-          )}
-          {showSidebar && (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleLogout}
-              disabled={isLoading}
-            >
-              {isLoading ? 'Logging out...' : 'Logout'}
-            </Button>
-          )}
-        </div>
-      </header>
+  // Auth pages - no sidebar, centered content
+  if (!showSidebar) {
+    return (
+      <div className="flex h-screen flex-col">
+        <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 h-14 shrink-0">
+          <div className="w-full flex items-center justify-center px-6 h-full">
+            <Link href="/" className="font-bold">
+              GuruChat
+            </Link>
+          </div>
+        </header>
+        <main className="flex-1 flex items-center justify-center overflow-hidden">
+          {children}
+        </main>
+      </div>
+    );
+  }
 
-      <SidebarProvider>
-        <div className="flex flex-1 overflow-hidden">
-          {showSidebar && (
-            // Use CSS variable for top offset and height calculation
-            <AppSidebar className="top-[var(--header-height)] h-[calc(100vh-var(--header-height))]" /> 
-          )}
-          {/* Main content area with specific overflow handling based on path */}
-          <main className={`flex flex-1 ${
-            showSidebar 
-              ? 'flex-col items-stretch justify-start overflow-auto' 
-              : 'items-center justify-center overflow-hidden h-[calc(100vh-var(--header-height))]'
-            } px-4 md:px-6 py-0`}>
-             {children}
-          </main>
+  // Main app with sidebar - shadcn sidebar-16 pattern
+  // Header INSIDE SidebarProvider, then sidebar/content below
+  return (
+    <div className="[--header-height:3.5rem]">
+      <SidebarProvider className="flex flex-col min-h-screen">
+        {/* Header - inside SidebarProvider so it works with sidebar toggle */}
+        <header className="bg-background sticky top-0 z-50 flex w-full items-center border-b h-[var(--header-height)] shrink-0">
+          <div className="flex w-full items-center gap-2 px-4">
+            <SidebarTrigger className="-ml-1" />
+            <Separator orientation="vertical" className="mr-2 h-4" />
+            <Link href="/" className="font-bold">
+              GuruChat
+            </Link>
+            <div className="ml-auto">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLogout}
+                disabled={isLoading}
+              >
+                {isLoading ? 'Logging out...' : 'Logout'}
+              </Button>
+            </div>
+          </div>
+        </header>
+
+        {/* Sidebar + Main content */}
+        <div className="flex flex-1">
+          <AppSidebar />
+          <SidebarInset className="overflow-hidden">
+            {children}
+          </SidebarInset>
         </div>
       </SidebarProvider>
     </div>
   );
-} 
+}

@@ -261,9 +261,9 @@ function ChatInterface() {
 
     // --- Render Chat Interface ---
     return (
-        <div className="flex flex-col h-[calc(100vh-var(--header-height))]">
-            {/* Chat Interface Container - Full height minus header */}
-            <div className="flex flex-col h-full border rounded-lg shadow-md overflow-hidden m-4">
+        <div className="flex flex-col h-full p-4">
+            {/* Chat Interface Container - Takes full height from SidebarInset */}
+            <div className="flex flex-col flex-1 min-h-0 border rounded-lg shadow-md overflow-hidden">
                 {/* Chat Header */}
                 <div className="p-4 border-b bg-muted/40 flex items-center justify-between shrink-0">
                     <div className='flex items-center space-x-3'>
