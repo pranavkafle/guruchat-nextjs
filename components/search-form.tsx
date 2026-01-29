@@ -17,7 +17,7 @@ interface SearchFormProps extends Omit<React.ComponentProps<"form">, 'onChange'>
 export function SearchForm({ value, onChange, ...props }: SearchFormProps) {
   return (
     <form {...props}>
-      <SidebarGroup className="py-0">
+      <SidebarGroup className="pt-2 pb-0">
         <SidebarGroupContent className="relative">
           <Label htmlFor="search" className="sr-only">
             Search

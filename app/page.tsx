@@ -61,8 +61,11 @@ export default function HomePage() {
     };
 
     return (
-        <div className="container mx-auto p-4 flex flex-col">
-            <h1 className="text-3xl font-bold mb-6 text-center">Select Your Guru</h1>
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain">
+            <div className="container mx-auto p-4 flex flex-col">
+                <h1 className="text-3xl font-bold mb-6 text-center">
+                    Choose Your Guru
+                </h1>
 
             {/* Loading State */}
             {isLoadingGurus && (
@@ -116,6 +119,7 @@ export default function HomePage() {
              {!isLoadingGurus && !errorGurus && gurus.length === 0 && (
                  <p className="text-center text-muted-foreground">No Gurus available. Check seeding.</p>
             )}
+            </div>
         </div>
     );
-} 
+}

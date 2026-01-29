@@ -1,12 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, Suspense, useRef } from 'react';
-import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useChat, UIMessage } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { mutate } from 'swr';
 
 // Shared types and utilities
@@ -19,10 +16,29 @@ import {
     ConversationEmptyState,
     ConversationScrollButton
 } from "@/components/ai-elements/conversation";
+import {
+    Message,
+    MessageContent,
+    MessageResponse
+} from "@/components/ai-elements/message";
+import { Shimmer } from "@/components/ai-elements/shimmer";
+import {
+    PromptInput,
+    PromptInputFooter,
+    PromptInputTextarea,
+    PromptInputSubmit
+} from "@/components/ai-elements/prompt-input";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger
+} from "@/components/ui/dialog";
 
 // Shadcn UI Imports
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -36,12 +52,17 @@ interface Guru {
     // Add other fields if needed
 }
 
+interface StoredMessage {
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+}
+
 // Interface for the full conversation data
 interface ConversationData {
     _id: string; // Conversation ID
     userId: string; // or Types.ObjectId if needed
     guruId: Guru; // The populated guru object
-    messages: UIMessage[];
+    messages: StoredMessage[];
     createdAt: string;
     updatedAt: string;
 }
@@ -59,8 +80,10 @@ function ChatInterface() {
     const [currentChatId, setCurrentChatId] = useState<string | null>(conversationId); // Track current chat for appending
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
-    const [input, setInput] = useState<string>('');
-    const inputRef = useRef<HTMLTextAreaElement>(null);
+    const [promptText, setPromptText] = useState<string>('');
+    const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+    const [isDeletingChat, setIsDeletingChat] = useState(false);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
 
     // Create transport once - body options passed per-request via sendMessage
     const transport = React.useMemo(() => {
@@ -70,7 +93,7 @@ function ChatInterface() {
     }, []);
 
     // --- Chat Hook (Declare BEFORE effects that use its return values) ---
-    const { messages, status, sendMessage, error: errorChat } = useChat({
+    const { messages, status, sendMessage, error: errorChat, stop, setMessages } = useChat({
         id: (conversationId || guruIdFromUrl) ?? undefined,
         transport,
         messages: initialMessages,
@@ -82,6 +105,7 @@ function ChatInterface() {
 
 
     const isLoadingChat = status === 'submitted' || status === 'streaming';
+    const canDeleteChat = !!(conversationId && isValidObjectId(conversationId));
 
     // Refresh sidebar chat history when streaming completes
     const prevStatusRef = useRef(status);
@@ -121,7 +145,8 @@ function ChatInterface() {
                         throw new Error('Conversation data missing populated Guru details.');
                     }
                     setSelectedGuru(convoData.guruId);
-                    setInitialMessages(convoData.messages || []);
+                    setInitialMessages((convoData.messages || []).map(toUIMessage));
+                    setCurrentChatId(conversationId);
 
 
                 } else if (guruIdFromUrl && isValidObjectId(guruIdFromUrl)) {
@@ -159,47 +184,27 @@ function ChatInterface() {
         // Depend on IDs from URL. Note: useSearchParams values are reactive.
     }, [conversationId, guruIdFromUrl]);
 
-
-    // --- Refocus Input Effect ---
     useEffect(() => {
-        // Now input & isLoadingChat are defined
-        if (input === '' && !isLoadingChat && !isLoading) {
-            inputRef.current?.focus();
-        }
-    }, [input, isLoadingChat, isLoading]);
+        setMessages(initialMessages);
+    }, [initialMessages, setMessages]);
 
-    // --- Initial Focus Effect ---
-    useEffect(() => {
-        // Now isLoading is defined
-        if (!isLoading && selectedGuru) {
-            inputRef.current?.focus();
-        }
-    }, [isLoading, selectedGuru]);
 
-    // Custom handlers for AI SDK 6 compatibility
-    const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        setInput(e.target.value);
-    };
-
-    // Helper to get text from UIMessage parts
-    const getMessageText = (m: UIMessage) => {
-        return m.parts
-            .filter(part => part.type === 'text')
-            .map(part => (part.type === 'text' ? part.text : ''))
-            .join('');
-    };
+    const toUIMessage = (m: StoredMessage, index: number): UIMessage => ({
+        id: `history-${conversationId || guruIdFromUrl || 'chat'}-${index}`,
+        role: m.role,
+        parts: m.content ? [{ type: 'text', text: m.content }] : [],
+    });
 
     // Custom submit handler
-    const handleChatSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        const text = input.trim();
-        if (!selectedGuru || !text || isLoadingChat || isLoading) {
+    const handleChatSubmit = async ({ text }: { text: string }) => {
+        const trimmed = text.trim();
+        if (!selectedGuru || !trimmed || isLoadingChat || isLoading) {
             return;
         }
-        setInput(''); // Clear input
+        setPromptText('');
         // Pass guruId and chatId - chatId determines append vs new
         await sendMessage(
-            { text },
+            { text: trimmed },
             {
                 body: {
                     guruId: selectedGuru._id,
@@ -209,16 +214,28 @@ function ChatInterface() {
         );
     };
 
-    // Handle Enter key press in Textarea
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            if (!input.trim() || isLoadingChat || isLoading) return;
-            const form = e.currentTarget.closest('form');
-            if (form) {
-                // In some environments requestSubmit is better
-                form.requestSubmit();
+    const handleDeleteChat = async () => {
+        if (!selectedGuru || !conversationId || !isValidObjectId(conversationId) || isDeletingChat) {
+            return;
+        }
+        setIsDeletingChat(true);
+        setDeleteError(null);
+        try {
+            const response = await fetch(`/api/chats?conversationId=${conversationId}`, {
+                method: 'DELETE',
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || data?.success === false) {
+                throw new Error(data?.message || 'Failed to delete chat.');
             }
+            await mutate('/api/chats');
+            setIsDeleteOpen(false);
+            router.push(`/chat?guruId=${selectedGuru._id}`);
+        } catch (error: any) {
+            console.error('Delete chat failed:', error);
+            setDeleteError(error.message || 'Delete failed.');
+        } finally {
+            setIsDeletingChat(false);
         }
     };
 
@@ -259,7 +276,7 @@ function ChatInterface() {
 
     // --- Render Chat Interface ---
     return (
-        <div className="flex flex-col h-full p-4">
+        <div className="flex flex-1 flex-col h-full min-h-0 p-4">
             {/* Chat Interface Container - Takes full height from SidebarInset */}
             <div className="flex flex-col flex-1 min-h-0 border rounded-lg shadow-md overflow-hidden">
                 {/* Chat Header */}
@@ -270,6 +287,9 @@ function ChatInterface() {
                             <AvatarFallback>{selectedGuru.name.substring(0, 1)}</AvatarFallback>
                         </Avatar>
                         <h2 className="text-xl font-semibold">{selectedGuru.name}</h2>
+                        <Button variant="outline" size="sm" onClick={() => router.push('/')}>
+                            Change Guru
+                        </Button>
                     </div>
                     <div className="flex gap-2">
                         {/* New Chat button - navigates to fresh conversation */}
@@ -283,10 +303,45 @@ function ChatInterface() {
                         >
                             New Chat
                         </Button>
-                        {/* Changed button to go back to home/guru selection */}
-                        <Button variant="outline" size="sm" onClick={() => router.push('/')}>
-                            Change Guru
-                        </Button>
+                        {canDeleteChat && (
+                            <Dialog open={isDeleteOpen} onOpenChange={(open) => {
+                                setIsDeleteOpen(open);
+                                if (!open) setDeleteError(null);
+                            }}>
+                                <DialogTrigger asChild>
+                                    <Button variant="destructive" size="sm">
+                                        Delete Chat
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>Delete chat?</DialogTitle>
+                                        <DialogDescription>
+                                            This will permanently delete this conversation.
+                                        </DialogDescription>
+                                    </DialogHeader>
+                                    {deleteError && (
+                                        <p className="text-sm text-destructive">{deleteError}</p>
+                                    )}
+                                    <DialogFooter>
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => setIsDeleteOpen(false)}
+                                            disabled={isDeletingChat}
+                                        >
+                                            Cancel
+                                        </Button>
+                                        <Button
+                                            variant="destructive"
+                                            onClick={handleDeleteChat}
+                                            disabled={isDeletingChat}
+                                        >
+                                            {isDeletingChat ? 'Deleting...' : 'Delete'}
+                                        </Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                        )}
                     </div>
                 </div>
 
@@ -303,66 +358,25 @@ function ChatInterface() {
                         ) : (
                             <>
                                 {messages.map((m) => (
-                                    <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                        <div className={`flex items-end max-w-xs md:max-w-md lg:max-w-lg ${m.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                                            <Avatar className={`h-6 w-6 mx-2 ${m.role === 'user' ? 'ml-2' : 'mr-2'}`}>
-                                                {m.role === 'assistant' ? (
-                                                    <>
-                                                        <AvatarImage src={getGuruImagePath(selectedGuru.name)} alt={selectedGuru.name} className="object-cover" />
-                                                        <AvatarFallback>{selectedGuru.name.substring(0, 1)}</AvatarFallback>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <AvatarImage src="/images/user-avatar.png" alt="User" />
-                                                        <AvatarFallback>You</AvatarFallback>
-                                                    </>
-                                                )}
-                                            </Avatar>
-                                            <div
-                                                className={`px-3 py-2 rounded-lg shadow-sm ${m.role === 'user'
-                                                    ? 'bg-primary text-primary-foreground'
-                                                    : 'bg-muted prose prose-sm dark:prose-invert max-w-none'
-                                                    }`}
-                                            >
-                                                {m.role === 'user' ? (
-                                                    <p className="text-sm whitespace-pre-wrap">{getMessageText(m)}</p>
-                                                ) : (
-                                                    <ReactMarkdown
-                                                        remarkPlugins={[remarkGfm]}
-                                                        components={{
-                                                            p: ({ children }) => <p className="text-sm mb-2 last:mb-0">{children}</p>,
-                                                            ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
-                                                            ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
-                                                            li: ({ children }) => <li className="mb-1">{children}</li>,
-                                                            h1: ({ children }) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
-                                                            h2: ({ children }) => <h2 className="text-md font-bold mb-2">{children}</h2>,
-                                                            code: ({ children }) => <code className="bg-muted-foreground/20 rounded px-1 text-xs">{children}</code>,
-                                                            pre: ({ children }) => <pre className="bg-muted-foreground/10 rounded p-2 overflow-x-auto my-2">{children}</pre>,
-                                                        }}
-                                                    >
-                                                        {getMessageText(m)}
-                                                    </ReactMarkdown>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
+                                    <Message key={m.id} from={m.role}>
+                                        <MessageContent>
+                                            {m.parts.map((part, i) =>
+                                                part.type === 'text' ? (
+                                                    <MessageResponse key={`${m.id}-${i}`}>{part.text}</MessageResponse>
+                                                ) : null
+                                            )}
+                                        </MessageContent>
+                                    </Message>
                                 ))}
-                                {/* Typing indicator */}
-                                {isLoadingChat && messages.length > 0 && messages[messages.length - 1].role === 'user' && (
-                                    <div className="flex justify-start">
-                                        <div className="flex items-end max-w-xs md:max-w-md lg:max-w-lg flex-row">
-                                            <Avatar className="h-6 w-6 mr-2">
-                                                <AvatarImage src={getGuruImagePath(selectedGuru.name)} alt={selectedGuru.name} className="object-cover" />
-                                                <AvatarFallback>{selectedGuru.name.substring(0, 1)}</AvatarFallback>
-                                            </Avatar>
-                                            <div className="px-3 py-2 rounded-lg bg-muted flex items-center gap-1">
-                                                <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                                                <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                                                <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
+                                {(status === 'submitted' || status === 'streaming') &&
+                                    messages.length > 0 &&
+                                    messages[messages.length - 1].role === 'user' && (
+                                        <Message from="assistant">
+                                            <MessageContent>
+                                                <Shimmer className="text-sm">typing...</Shimmer>
+                                            </MessageContent>
+                                        </Message>
+                                    )}
                             </>
                         )}
                     </ConversationContent>
@@ -377,25 +391,23 @@ function ChatInterface() {
                             <AlertDescription>{errorChat.message || 'An error occurred.'}</AlertDescription>
                         </Alert>
                     )}
-                    <form onSubmit={handleChatSubmit} className="flex items-center space-x-2">
-                        <Textarea
-                            ref={inputRef}
-                            value={input}
-                            onChange={handleInputChange}
-                            onKeyDown={handleKeyDown}
-                            placeholder="Ask your Guru anything..."
-                            className="flex-grow resize-none py-1.5"
-                            rows={1}
-                            disabled={isLoading || isLoadingChat}
-                        />
-                        <Button
-                            type="submit"
-                            size="sm"
-                            disabled={isLoading || isLoadingChat || !input.trim()}
-                        >
-                            {isLoadingChat ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Send'}
-                        </Button>
-                    </form>
+                    <PromptInput
+                        onSubmit={handleChatSubmit}
+                        className="w-full"
+                    >
+                        <PromptInputFooter>
+                            <PromptInputTextarea
+                                placeholder="Ask your Guru anything..."
+                                disabled={isLoading || isLoadingChat}
+                                onChange={(e) => setPromptText(e.currentTarget.value)}
+                            />
+                            <PromptInputSubmit
+                                status={status}
+                                onStop={stop}
+                                disabled={isLoading || isLoadingChat || !promptText.trim()}
+                            />
+                        </PromptInputFooter>
+                    </PromptInput>
                 </div>
             </div>
         </div>

@@ -1,8 +1,7 @@
 'use client'; // Need this for hooks
 
 import React, { useState, useEffect } from 'react'; // Added hooks
-import Link from 'next/link'; // Import Link for client-side navigation
-import { GalleryVerticalEnd, Minus, Plus, MessageSquareText } from "lucide-react" // Added MessageSquareText
+import { Minus, Plus, MessageSquareText } from "lucide-react" // Added MessageSquareText
 import { useRouter } from 'next/navigation'; // To navigate on chat click
 import useSWR from 'swr';
 
@@ -21,7 +20,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
-  SidebarMenuSubButton,
   SidebarMenuSubItem,
   SidebarRail,
 } from "@/components/ui/sidebar"
@@ -136,23 +134,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     router.push(`/chat?guruId=${guruId}&chatId=${conversationId}`);
   };
 
+
   return (
     <Sidebar {...props}>
       <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild>
-              <Link href="/"> { /* Link to home/guru selection */}
-                <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                  <GalleryVerticalEnd className="size-4" />
-                </div>
-                <div className="flex flex-col gap-0.5 leading-none">
-                  <span className="font-medium">Chat History</span>
-                </div>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
         {/* Pass value and onChange to SearchForm */}
         <SearchForm value={searchTerm} onChange={handleSearchChange} />
       </SidebarHeader>

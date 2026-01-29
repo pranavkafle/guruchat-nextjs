@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
                 _id: new mongoose.Types.ObjectId(conversationId),
                 userId: userObjectId // Ensure the user owns this chat
             })
-                .populate({ path: 'guruId', select: 'name' }) // Still populate guru name
+                .populate({ path: 'guruId', select: 'name description' }) // Include description for chat UI
                 .lean();
 
             if (!specificChat) {
@@ -80,7 +80,7 @@ export async function GET(req: NextRequest) {
                 userId: userObjectId,
                 guruId: new mongoose.Types.ObjectId(guruId)
             })
-                .populate({ path: 'guruId', select: 'name' })
+                .populate({ path: 'guruId', select: 'name description' })
                 .lean();
 
             if (!guruChat) {
@@ -99,7 +99,7 @@ export async function GET(req: NextRequest) {
             console.log(`Fetching history summary for user ${userId}`);
             const chats = await Chat.find({ userId: userObjectId })
                 .sort({ updatedAt: -1 })
-                .populate({ path: 'guruId', select: 'name' })
+                .populate({ path: 'guruId', select: 'name description' })
                 .lean();
 
             // --- 4. Process History (Group by Guru and create summaries) ---
@@ -166,4 +166,55 @@ export async function GET(req: NextRequest) {
         }
         return NextResponse.json({ error: error.message || 'Internal Server Error fetching chat history' }, { status: 500 });
     }
-} 
+}
+
+export async function DELETE(req: NextRequest) {
+    const url = new URL(req.url);
+    const conversationId = url.searchParams.get('conversationId');
+
+    if (!JWT_SECRET) {
+        console.error('JWT_SECRET is not defined for chat delete');
+        return NextResponse.json({ error: 'Internal Server Error: JWT configuration missing' }, { status: 500 });
+    }
+
+    if (!conversationId || !mongoose.Types.ObjectId.isValid(conversationId)) {
+        return NextResponse.json({ success: false, message: 'Invalid Conversation ID format' }, { status: 400 });
+    }
+
+    try {
+        const tokenCookie = req.cookies.get('jwt_token');
+        if (!tokenCookie) {
+            return NextResponse.json({ error: 'Unauthorized: Missing token cookie' }, { status: 401 });
+        }
+        const token = tokenCookie.value;
+
+        const decodedToken = jwt.decode(token) as { userId?: string };
+        if (!decodedToken) {
+            return NextResponse.json({ error: 'Unauthorized: Invalid token format' }, { status: 401 });
+        }
+        const userId = decodedToken.userId;
+        if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+            return NextResponse.json({ error: 'Unauthorized: Invalid user ID in token' }, { status: 401 });
+        }
+        const userObjectId = new mongoose.Types.ObjectId(userId);
+
+        await connectDB();
+
+        const deleted = await Chat.findOneAndDelete({
+            _id: new mongoose.Types.ObjectId(conversationId),
+            userId: userObjectId,
+        });
+
+        if (!deleted) {
+            return NextResponse.json({ success: false, message: 'Conversation not found or user unauthorized' }, { status: 404 });
+        }
+
+        return NextResponse.json({ success: true, message: 'Conversation deleted' }, { status: 200 });
+    } catch (error: any) {
+        console.error("Error in DELETE /api/chats:", error);
+        if (error.name === 'JsonWebTokenError' || error.name === 'NotBeforeError' || error.name === 'TokenExpiredError') {
+            return NextResponse.json({ error: `Unauthorized: ${error.message}` }, { status: 401 });
+        }
+        return NextResponse.json({ error: error.message || 'Internal Server Error deleting chat' }, { status: 500 });
+    }
+}

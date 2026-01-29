@@ -59,8 +59,8 @@ export function SiteLayout({ children }: SiteLayoutProps) {
   // Main app with sidebar - shadcn sidebar-16 pattern
   // Header INSIDE SidebarProvider, then sidebar/content below
   return (
-    <div className="[--header-height:3.5rem]">
-      <SidebarProvider className="flex flex-col min-h-screen">
+    <div className="[--header-height:3.5rem] h-svh overflow-hidden">
+      <SidebarProvider className="flex h-full w-full flex-col">
         {/* Header - inside SidebarProvider so it works with sidebar toggle */}
         <header className="bg-background sticky top-0 z-50 flex w-full items-center border-b h-[var(--header-height)] shrink-0">
           <div className="flex w-full items-center gap-2 px-4">
@@ -83,9 +83,9 @@ export function SiteLayout({ children }: SiteLayoutProps) {
         </header>
 
         {/* Sidebar + Main content */}
-        <div className="flex flex-1">
+        <div className="flex flex-1 min-h-0">
           <AppSidebar />
-          <SidebarInset className="overflow-hidden">
+          <SidebarInset className="min-h-0 overflow-hidden">
             {children}
           </SidebarInset>
         </div>
