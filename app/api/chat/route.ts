@@ -26,7 +26,7 @@ const googleProvider = createGoogleGenerativeAI({
 
 // Export named POST function
 export async function POST(req: NextRequest) {
-  console.log('POST /api/chat hit');
+
 
   // Check if GOOGLE_API_KEY is missing (checked at module load, but double-check)
   if (!GOOGLE_API_KEY) {
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
       console.error('Invalid or missing user ID in token payload:', userId);
       return NextResponse.json({ error: 'Unauthorized: Invalid user ID in token' }, { status: 401 });
     }
-    console.log('Authenticated user ID (from decoded token):', userId);
+
 
     // --- Restore Original Logic ---
 
@@ -85,14 +85,15 @@ export async function POST(req: NextRequest) {
       const guru = await Guru.findById(guruId);
       if (guru && guru.systemPrompt) {
         systemPrompt = guru.systemPrompt;
-        console.log(`Using system prompt for Guru ID: ${guruId}`);
+        // console.log(`Using system prompt for Guru ID: ${guruId}`);
+
       } else {
-        console.warn(`Guru not found or has no system prompt for ID: ${guruId}. Using default.`);
+
       }
     } else if (guruId) {
-      console.warn(`Invalid Guru ID provided: ${guruId}. Using default system prompt.`);
+
     } else {
-      console.log('No Guru ID provided. Using default system prompt.');
+
     }
     // Helper to get text from UIMessage parts
     const getMessageText = (m: any) => {
@@ -107,9 +108,12 @@ export async function POST(req: NextRequest) {
     };
 
     // --- 5. Call AI using Vercel AI SDK streamText ---
-    console.log('Calling streamText with model:', 'models/gemini-2.5-flash');
-    console.log('System Prompt:', systemPrompt);
-    console.log('Messages:', JSON.stringify(messages, null, 2)); // Log the messages being sent
+    // console.log('Calling streamText with model:', 'models/gemini-2.5-flash');
+
+    // console.log('System Prompt:', systemPrompt);
+
+    // console.log('Messages:', JSON.stringify(messages, null, 2)); // Log the messages being sent
+
 
     // Convert UIMessages to ModelMessages for streamText
     const modelMessages = await convertToModelMessages(messages);
@@ -125,7 +129,8 @@ export async function POST(req: NextRequest) {
       },
       onFinish: async ({ text, toolCalls, toolResults, usage, finishReason }) => {
         // --- 7. Save/Update Chat History (Revised for Conversation Thread) ---
-        console.log('[Save History] Gemini full response received:', text);
+        // console.log('[Save History] Gemini full response received:', text);
+
         try {
           const lastUserMessage = messages.length > 0 ? messages[messages.length - 1] : null;
           if (!lastUserMessage || lastUserMessage.role !== 'user') {
@@ -149,14 +154,15 @@ export async function POST(req: NextRequest) {
             { role: 'user', content: getMessageText(lastUserMessage) },
             { role: 'assistant', content: text }
           ];
-          console.log(`[Save History] chatId: ${chatId || 'NEW'}, guruId: ${validGuruId}`);
-          console.log(`[Save History] messagesToAppend:`, JSON.stringify(messagesToAppend));
+
+
 
           let updatedChat;
 
           if (chatId && mongoose.Types.ObjectId.isValid(chatId)) {
             // Append to existing conversation
-            console.log(`[Save History] Appending to existing conversation: ${chatId}`);
+            // console.log(`[Save History] Appending to existing conversation: ${chatId}`);
+
             updatedChat = await Chat.findOneAndUpdate(
               { _id: new mongoose.Types.ObjectId(chatId), userId: userObjectId },
               { $push: { messages: { $each: messagesToAppend } } },
@@ -164,7 +170,8 @@ export async function POST(req: NextRequest) {
             );
           } else {
             // Create new conversation
-            console.log(`[Save History] Creating new conversation for guru: ${validGuruId}`);
+            // console.log(`[Save History] Creating new conversation for guru: ${validGuruId}`);
+
             updatedChat = await Chat.create({
               userId: userObjectId,
               guruId: validGuruId,
@@ -173,7 +180,7 @@ export async function POST(req: NextRequest) {
           }
 
           if (updatedChat) {
-            console.log(`[Save History] Chat ${updatedChat._id} saved successfully.`);
+
           } else {
             console.error('[Save History] Failed to save chat.');
           }

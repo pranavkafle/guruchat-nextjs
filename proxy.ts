@@ -23,8 +23,10 @@ async function verifyToken(token: string): Promise<any> {
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  console.log(`[Proxy] Pathname: ${pathname}`); // Log requested path
-  console.log(`[Proxy] Method: ${request.method}`); // Log request method
+  console.log(`[Proxy] Pathname: ${pathname}`);
+
+  console.log(`[Proxy] Method: ${request.method}`);
+
 
   // Get token from cookies 
   // **IMPORTANT**: Assumes login sets an httpOnly cookie named 'jwt_token'. 
@@ -56,16 +58,16 @@ export async function proxy(request: NextRequest) {
   const isLoginApi = pathname.startsWith('/api/auth/login');
   const isRegisterApi = pathname.startsWith('/api/auth/register');
 
-  console.log(`[Proxy] Unauthenticated. Path: ${pathname}. isLoginApi=${isLoginApi}, isRegisterApi=${isRegisterApi}`);
+
 
   // Allow access to login/register pages and their corresponding API endpoints
   if (isLoginPage || isRegisterPage || isLoginApi || isRegisterApi) {
-    console.log('[Proxy] Allowing access to public auth page or API route.');
+
     return NextResponse.next();
   }
 
   // For all other routes, redirect unauthenticated users to the login page
-  console.log(`[Proxy] Unauthenticated user on protected route (${pathname}). Redirecting to /login`);
+
   return NextResponse.redirect(new URL('/login', request.url));
 }
 

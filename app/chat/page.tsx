@@ -5,20 +5,28 @@ import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useChat, UIMessage } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
-import mongoose from 'mongoose';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { mutate } from 'swr';
 
+// Shared types and utilities
+import { isValidObjectId, getGuruImagePath } from '@/lib/types';
+
+// AI Elements for auto-scroll
+import {
+    Conversation,
+    ConversationContent,
+    ConversationEmptyState,
+    ConversationScrollButton
+} from "@/components/ai-elements/conversation";
 
 // Shadcn UI Imports
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"; // For chat messages
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // For errors
-import { Loader2 } from 'lucide-react'; // For loading states
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Loader2, MessageCircle } from 'lucide-react';
 
 // Define the Guru type based on your API response/model
 interface Guru {
@@ -38,16 +46,6 @@ interface ConversationData {
     updatedAt: string;
 }
 
-// Helper function to generate image paths based on guru names
-function getGuruImagePath(guruName: string): string {
-    // Normalize the name by removing diacritics and converting to lowercase
-    const normalizedName = guruName
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
-        .toLowerCase()
-        .replace(/\s+/g, '_') + '.png';
-    return `/images/${normalizedName}`; // Assuming images are in public/images
-}
 
 // Main Chat Component Logic
 function ChatInterface() {
@@ -106,8 +104,8 @@ function ChatInterface() {
 
             try {
                 // If we have a conversationId, load that specific conversation
-                if (conversationId && mongoose.Types.ObjectId.isValid(conversationId)) {
-                    console.log(`Fetching conversation: ${conversationId}`);
+                if (conversationId && isValidObjectId(conversationId)) {
+
                     const response = await fetch(`/api/chats?conversationId=${conversationId}`);
                     if (!response.ok) {
                         let errorMsg = `Failed to fetch conversation: ${response.statusText}`;
@@ -124,11 +122,11 @@ function ChatInterface() {
                     }
                     setSelectedGuru(convoData.guruId);
                     setInitialMessages(convoData.messages || []);
-                    console.log(`Loaded ${convoData.messages?.length || 0} messages from history.`);
 
-                } else if (guruIdFromUrl && mongoose.Types.ObjectId.isValid(guruIdFromUrl)) {
+
+                } else if (guruIdFromUrl && isValidObjectId(guruIdFromUrl)) {
                     // Only fetch guru details - START FRESH (ChatGPT-style)
-                    console.log(`Fetching guru ${guruIdFromUrl} details - starting fresh conversation`);
+
                     const guruResponse = await fetch(`/api/gurus/${guruIdFromUrl}`);
 
                     if (!guruResponse.ok) {
@@ -143,7 +141,7 @@ function ChatInterface() {
                     // Always start fresh - don't load existing conversation
                     setInitialMessages([]);
                     setCurrentChatId(null);
-                    console.log('Ready for new conversation');
+
 
                 } else {
                     throw new Error('Invalid or missing Guru ID or Conversation ID.');
@@ -293,70 +291,83 @@ function ChatInterface() {
                 </div>
 
 
-                {/* Messages Area - Scrollable area that takes available space */}
-                <ScrollArea className="flex-grow overflow-auto p-4 bg-background" id="message-scroll-area">
-                    <div className="space-y-4">
-                        {messages.map((m) => (
-                            <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`flex items-end max-w-xs md:max-w-md lg:max-w-lg ${m.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
-                                    <Avatar className={`h-6 w-6 mx-2 ${m.role === 'user' ? 'ml-2' : 'mr-2'}`}>
-                                        {m.role === 'assistant' ? (
-                                            <>
+                {/* Messages Area - Auto-scrolling conversation container */}
+                <Conversation className="flex-1 min-h-0 bg-background">
+                    <ConversationContent className="p-4 gap-4">
+                        {messages.length === 0 ? (
+                            <ConversationEmptyState
+                                icon={<MessageCircle className="h-12 w-12" />}
+                                title={`Chat with ${selectedGuru.name}`}
+                                description={`Ask ${selectedGuru.name} anything about ${selectedGuru.description.toLowerCase()}`}
+                            />
+                        ) : (
+                            <>
+                                {messages.map((m) => (
+                                    <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                        <div className={`flex items-end max-w-xs md:max-w-md lg:max-w-lg ${m.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                                            <Avatar className={`h-6 w-6 mx-2 ${m.role === 'user' ? 'ml-2' : 'mr-2'}`}>
+                                                {m.role === 'assistant' ? (
+                                                    <>
+                                                        <AvatarImage src={getGuruImagePath(selectedGuru.name)} alt={selectedGuru.name} className="object-cover" />
+                                                        <AvatarFallback>{selectedGuru.name.substring(0, 1)}</AvatarFallback>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <AvatarImage src="/images/user-avatar.png" alt="User" />
+                                                        <AvatarFallback>You</AvatarFallback>
+                                                    </>
+                                                )}
+                                            </Avatar>
+                                            <div
+                                                className={`px-3 py-2 rounded-lg shadow-sm ${m.role === 'user'
+                                                    ? 'bg-primary text-primary-foreground'
+                                                    : 'bg-muted prose prose-sm dark:prose-invert max-w-none'
+                                                    }`}
+                                            >
+                                                {m.role === 'user' ? (
+                                                    <p className="text-sm whitespace-pre-wrap">{getMessageText(m)}</p>
+                                                ) : (
+                                                    <ReactMarkdown
+                                                        remarkPlugins={[remarkGfm]}
+                                                        components={{
+                                                            p: ({ children }) => <p className="text-sm mb-2 last:mb-0">{children}</p>,
+                                                            ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
+                                                            ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
+                                                            li: ({ children }) => <li className="mb-1">{children}</li>,
+                                                            h1: ({ children }) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
+                                                            h2: ({ children }) => <h2 className="text-md font-bold mb-2">{children}</h2>,
+                                                            code: ({ children }) => <code className="bg-muted-foreground/20 rounded px-1 text-xs">{children}</code>,
+                                                            pre: ({ children }) => <pre className="bg-muted-foreground/10 rounded p-2 overflow-x-auto my-2">{children}</pre>,
+                                                        }}
+                                                    >
+                                                        {getMessageText(m)}
+                                                    </ReactMarkdown>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                                {/* Typing indicator */}
+                                {isLoadingChat && messages.length > 0 && messages[messages.length - 1].role === 'user' && (
+                                    <div className="flex justify-start">
+                                        <div className="flex items-end max-w-xs md:max-w-md lg:max-w-lg flex-row">
+                                            <Avatar className="h-6 w-6 mr-2">
                                                 <AvatarImage src={getGuruImagePath(selectedGuru.name)} alt={selectedGuru.name} className="object-cover" />
                                                 <AvatarFallback>{selectedGuru.name.substring(0, 1)}</AvatarFallback>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <AvatarImage src="/images/user-avatar.png" alt="User" />
-                                                <AvatarFallback>You</AvatarFallback>
-                                            </>
-                                        )}
-                                    </Avatar>
-                                    <div
-                                        className={`px-3 py-2 rounded-lg shadow-sm ${m.role === 'user'
-                                            ? 'bg-primary text-primary-foreground'
-                                            : 'bg-muted prose prose-sm dark:prose-invert max-w-none'
-                                            }`}
-                                    >
-                                        {m.role === 'user' ? (
-                                            <p className="text-sm whitespace-pre-wrap">{getMessageText(m)}</p>
-                                        ) : (
-                                            <ReactMarkdown
-                                                remarkPlugins={[remarkGfm]}
-                                                components={{
-                                                    // Customize markdown elements to match your design system
-                                                    p: ({ children }) => <p className="text-sm mb-2 last:mb-0">{children}</p>,
-                                                    ul: ({ children }) => <ul className="list-disc ml-4 mb-2">{children}</ul>,
-                                                    ol: ({ children }) => <ol className="list-decimal ml-4 mb-2">{children}</ol>,
-                                                    li: ({ children }) => <li className="mb-1">{children}</li>,
-                                                    h1: ({ children }) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
-                                                    h2: ({ children }) => <h2 className="text-md font-bold mb-2">{children}</h2>,
-                                                    code: ({ children }) => <code className="bg-muted-foreground/20 rounded px-1 text-xs">{children}</code>,
-                                                    pre: ({ children }) => <pre className="bg-muted-foreground/10 rounded p-2 overflow-x-auto my-2">{children}</pre>,
-                                                }}
-                                            >
-                                                {getMessageText(m)}
-                                            </ReactMarkdown>
-                                        )}
+                                            </Avatar>
+                                            <div className="px-3 py-2 rounded-lg bg-muted flex items-center gap-1">
+                                                <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                                <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                                <span className="w-2 h-2 bg-muted-foreground/50 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
-                            </div>
-                        ))}
-                        {isLoadingChat && messages.length > 0 && messages[messages.length - 1].role === 'user' && (
-                            <div className="flex justify-start">
-                                <div className="flex items-end max-w-xs md:max-w-md lg:max-w-lg flex-row">
-                                    <Avatar className={`h-6 w-6 mr-2`}>
-                                        <AvatarImage src={getGuruImagePath(selectedGuru.name)} alt={selectedGuru.name} className="object-cover" />
-                                        <AvatarFallback>{selectedGuru.name.substring(0, 1)}</AvatarFallback>
-                                    </Avatar>
-                                    <div className="px-3 py-2 rounded-lg bg-muted flex items-center">
-                                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                                    </div>
-                                </div>
-                            </div>
+                                )}
+                            </>
                         )}
-                    </div>
-                </ScrollArea>
+                    </ConversationContent>
+                    <ConversationScrollButton />
+                </Conversation>
 
                 {/* Input Area */}
                 <div className="p-4 border-t bg-muted/40 shrink-0">
