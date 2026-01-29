@@ -26,6 +26,9 @@ Thumbs.db
 # Vercel
 .vercel
 
+# Cursor
+.cursor
+
 # Editor directories and files
 .vscode
 *.suo
