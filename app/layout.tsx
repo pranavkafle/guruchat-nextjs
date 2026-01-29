@@ -3,6 +3,8 @@ import type { Metadata } from 'next'
 import './globals.css'
 import { SiteLayout } from '@/components/layout/site-layout'
 import { Inter } from 'next/font/google'
+import { Analytics } from '@vercel/analytics/next'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -22,7 +24,9 @@ export default function RootLayout({
         <SiteLayout>
           {children}
         </SiteLayout>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   )
-} 
+}
