@@ -3,10 +3,13 @@
 import React, { useState, useEffect, Suspense, useRef } from 'react';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useChat, Message } from 'ai/react';
+import { useChat, UIMessage } from '@ai-sdk/react';
+import { DefaultChatTransport } from 'ai';
 import mongoose from 'mongoose';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { mutate } from 'swr';
+
 
 // Shadcn UI Imports
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,7 +33,7 @@ interface ConversationData {
     _id: string; // Conversation ID
     userId: string; // or Types.ObjectId if needed
     guruId: Guru; // The populated guru object
-    messages: Message[];
+    messages: UIMessage[];
     createdAt: string;
     updatedAt: string;
 }
@@ -54,25 +57,46 @@ function ChatInterface() {
     const conversationId = searchParams.get('chatId');
 
     const [selectedGuru, setSelectedGuru] = useState<Guru | null>(null);
-    const [initialMessages, setInitialMessages] = useState<Message[]>([]);
+    const [initialMessages, setInitialMessages] = useState<UIMessage[]>([]);
+    const [currentChatId, setCurrentChatId] = useState<string | null>(conversationId); // Track current chat for appending
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
+    const [input, setInput] = useState<string>('');
     const inputRef = useRef<HTMLTextAreaElement>(null);
 
+    // Create transport once - body options passed per-request via sendMessage
+    const transport = React.useMemo(() => {
+        return new DefaultChatTransport({
+            api: '/api/chat',
+        });
+    }, []);
+
     // --- Chat Hook (Declare BEFORE effects that use its return values) ---
-    const { messages, input, handleInputChange, handleSubmit, isLoading: isLoadingChat, error: errorChat } = useChat({
-        key: (conversationId || guruIdFromUrl) ?? undefined,
-        api: '/api/chat',
-        body: {
-            guruId: selectedGuru?._id ? selectedGuru._id : undefined,
-        },
-        initialMessages: initialMessages,
+    const { messages, status, sendMessage, error: errorChat } = useChat({
+        id: (conversationId || guruIdFromUrl) ?? undefined,
+        transport,
+        messages: initialMessages,
         onError: (err) => {
             console.error("Chat error:", err);
         },
     });
 
+
+
+    const isLoadingChat = status === 'submitted' || status === 'streaming';
+
+    // Refresh sidebar chat history when streaming completes
+    const prevStatusRef = useRef(status);
+    useEffect(() => {
+        if (prevStatusRef.current === 'streaming' && status === 'ready') {
+            // Message completed - refresh sidebar
+            mutate('/api/chats');
+        }
+        prevStatusRef.current = status;
+    }, [status]);
+
     // --- Fetch Initial Data ---
+
     useEffect(() => {
         const fetchInitialData = async () => {
             setIsLoading(true);
@@ -81,43 +105,48 @@ function ChatInterface() {
             setSelectedGuru(null); // Reset guru
 
             try {
-                let url = '';
-                let isFetchingConversation = false;
-
+                // If we have a conversationId, load that specific conversation
                 if (conversationId && mongoose.Types.ObjectId.isValid(conversationId)) {
                     console.log(`Fetching conversation: ${conversationId}`);
-                    url = `/api/chats?conversationId=${conversationId}`;
-                    isFetchingConversation = true;
-                } else if (guruIdFromUrl && mongoose.Types.ObjectId.isValid(guruIdFromUrl)) {
-                    console.log(`Fetching guru details: ${guruIdFromUrl}`);
-                    url = `/api/gurus/${guruIdFromUrl}`;
-                } else {
-                    throw new Error('Invalid or missing Guru ID or Conversation ID.');
-                }
-
-                const response = await fetch(url);
-                if (!response.ok) {
-                    let errorMsg = `Failed to fetch initial data: ${response.statusText}`;
-                    try { const errBody = await response.json(); errorMsg = errBody.message || errorMsg; } catch (e) { }
-                    throw new Error(errorMsg);
-                }
-                const data = await response.json();
-                if (!data.success || !data.data) {
-                    throw new Error('Invalid API response format.');
-                }
-
-                if (isFetchingConversation) {
+                    const response = await fetch(`/api/chats?conversationId=${conversationId}`);
+                    if (!response.ok) {
+                        let errorMsg = `Failed to fetch conversation: ${response.statusText}`;
+                        try { const errBody = await response.json(); errorMsg = errBody.message || errorMsg; } catch (e) { }
+                        throw new Error(errorMsg);
+                    }
+                    const data = await response.json();
+                    if (!data.success || !data.data) {
+                        throw new Error('Invalid API response format.');
+                    }
                     const convoData = data.data as ConversationData;
-                    // Use the populated guruId object directly
                     if (!convoData.guruId || !convoData.guruId._id) {
                         throw new Error('Conversation data missing populated Guru details.');
                     }
-                    setSelectedGuru(convoData.guruId); // Set the full guru object
+                    setSelectedGuru(convoData.guruId);
                     setInitialMessages(convoData.messages || []);
                     console.log(`Loaded ${convoData.messages?.length || 0} messages from history.`);
-                } else {
-                    setSelectedGuru(data.data as Guru);
+
+                } else if (guruIdFromUrl && mongoose.Types.ObjectId.isValid(guruIdFromUrl)) {
+                    // Only fetch guru details - START FRESH (ChatGPT-style)
+                    console.log(`Fetching guru ${guruIdFromUrl} details - starting fresh conversation`);
+                    const guruResponse = await fetch(`/api/gurus/${guruIdFromUrl}`);
+
+                    if (!guruResponse.ok) {
+                        throw new Error(`Failed to fetch guru: ${guruResponse.statusText}`);
+                    }
+                    const guruData = await guruResponse.json();
+                    if (!guruData.success || !guruData.data) {
+                        throw new Error('Invalid API response format for guru.');
+                    }
+                    setSelectedGuru(guruData.data as Guru);
+
+                    // Always start fresh - don't load existing conversation
                     setInitialMessages([]);
+                    setCurrentChatId(null);
+                    console.log('Ready for new conversation');
+
+                } else {
+                    throw new Error('Invalid or missing Guru ID or Conversation ID.');
                 }
 
             } catch (error: any) {
@@ -131,6 +160,7 @@ function ChatInterface() {
         fetchInitialData();
         // Depend on IDs from URL. Note: useSearchParams values are reactive.
     }, [conversationId, guruIdFromUrl]);
+
 
     // --- Refocus Input Effect ---
     useEffect(() => {
@@ -148,13 +178,37 @@ function ChatInterface() {
         }
     }, [isLoading, selectedGuru]);
 
+    // Custom handlers for AI SDK 6 compatibility
+    const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        setInput(e.target.value);
+    };
+
+    // Helper to get text from UIMessage parts
+    const getMessageText = (m: UIMessage) => {
+        return m.parts
+            .filter(part => part.type === 'text')
+            .map(part => (part.type === 'text' ? part.text : ''))
+            .join('');
+    };
+
     // Custom submit handler
-    const handleChatSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    const handleChatSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        if (!selectedGuru || !input.trim() || isLoadingChat || isLoading) {
+        const text = input.trim();
+        if (!selectedGuru || !text || isLoadingChat || isLoading) {
             return;
         }
-        handleSubmit(e);
+        setInput(''); // Clear input
+        // Pass guruId and chatId - chatId determines append vs new
+        await sendMessage(
+            { text },
+            {
+                body: {
+                    guruId: selectedGuru._id,
+                    chatId: currentChatId, // If set, appends to existing; if null, creates new
+                },
+            }
+        );
     };
 
     // Handle Enter key press in Textarea
@@ -164,6 +218,7 @@ function ChatInterface() {
             if (!input.trim() || isLoadingChat || isLoading) return;
             const form = e.currentTarget.closest('form');
             if (form) {
+                // In some environments requestSubmit is better
                 form.requestSubmit();
             }
         }
@@ -218,11 +273,25 @@ function ChatInterface() {
                         </Avatar>
                         <h2 className="text-xl font-semibold">{selectedGuru.name}</h2>
                     </div>
-                    {/* Changed button to go back to home/guru selection */}
-                    <Button variant="outline" size="sm" onClick={() => router.push('/')}>
-                        Change Guru
-                    </Button>
+                    <div className="flex gap-2">
+                        {/* New Chat button - navigates to fresh conversation */}
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                // Force page reload to clear chat state and start fresh
+                                window.location.href = `/chat?guruId=${selectedGuru._id}`;
+                            }}
+                        >
+                            New Chat
+                        </Button>
+                        {/* Changed button to go back to home/guru selection */}
+                        <Button variant="outline" size="sm" onClick={() => router.push('/')}>
+                            Change Guru
+                        </Button>
+                    </div>
                 </div>
+
 
                 {/* Messages Area - Scrollable area that takes available space */}
                 <ScrollArea className="flex-grow overflow-auto p-4 bg-background" id="message-scroll-area">
@@ -245,12 +314,12 @@ function ChatInterface() {
                                     </Avatar>
                                     <div
                                         className={`px-3 py-2 rounded-lg shadow-sm ${m.role === 'user'
-                                                ? 'bg-primary text-primary-foreground'
-                                                : 'bg-muted prose prose-sm dark:prose-invert max-w-none'
+                                            ? 'bg-primary text-primary-foreground'
+                                            : 'bg-muted prose prose-sm dark:prose-invert max-w-none'
                                             }`}
                                     >
                                         {m.role === 'user' ? (
-                                            <p className="text-sm whitespace-pre-wrap">{m.content}</p>
+                                            <p className="text-sm whitespace-pre-wrap">{getMessageText(m)}</p>
                                         ) : (
                                             <ReactMarkdown
                                                 remarkPlugins={[remarkGfm]}
@@ -266,7 +335,7 @@ function ChatInterface() {
                                                     pre: ({ children }) => <pre className="bg-muted-foreground/10 rounded p-2 overflow-x-auto my-2">{children}</pre>,
                                                 }}
                                             >
-                                                {m.content}
+                                                {getMessageText(m)}
                                             </ReactMarkdown>
                                         )}
                                     </div>

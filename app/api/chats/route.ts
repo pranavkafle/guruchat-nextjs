@@ -48,18 +48,18 @@ export async function GET(req: NextRequest) {
 
         // --- 3. Fetch Data (Conditional) --- 
         if (conversationId) {
-            // --- Fetch Specific Conversation --- 
+            // --- Fetch Specific Conversation by ID --- 
             console.log(`Fetching specific conversation ${conversationId} for user ${userId}`);
             if (!mongoose.Types.ObjectId.isValid(conversationId)) {
                 return NextResponse.json({ success: false, message: 'Invalid Conversation ID format' }, { status: 400 });
             }
 
-            const specificChat = await Chat.findOne({ 
-                _id: new mongoose.Types.ObjectId(conversationId), 
+            const specificChat = await Chat.findOne({
+                _id: new mongoose.Types.ObjectId(conversationId),
                 userId: userObjectId // Ensure the user owns this chat
             })
-            .populate({ path: 'guruId', select: 'name' }) // Still populate guru name
-            .lean(); 
+                .populate({ path: 'guruId', select: 'name' }) // Still populate guru name
+                .lean();
 
             if (!specificChat) {
                 return NextResponse.json({ success: false, message: 'Conversation not found or user unauthorized' }, { status: 404 });
@@ -68,21 +68,47 @@ export async function GET(req: NextRequest) {
             // Return the single chat document, including all messages
             return NextResponse.json({ success: true, data: specificChat }, { status: 200 });
 
+        } else if (url.searchParams.get('guruId')) {
+            // --- Fetch Conversation for a Specific Guru ---
+            const guruId = url.searchParams.get('guruId');
+            console.log(`Fetching conversation for guru ${guruId} for user ${userId}`);
+            if (!guruId || !mongoose.Types.ObjectId.isValid(guruId)) {
+                return NextResponse.json({ success: false, message: 'Invalid Guru ID format' }, { status: 400 });
+            }
+
+            const guruChat = await Chat.findOne({
+                userId: userObjectId,
+                guruId: new mongoose.Types.ObjectId(guruId)
+            })
+                .populate({ path: 'guruId', select: 'name' })
+                .lean();
+
+            if (!guruChat) {
+                // No existing conversation - return empty data (not an error)
+                console.log(`No existing conversation found for guru ${guruId}`);
+                return NextResponse.json({ success: true, data: null, message: 'No existing conversation' }, { status: 200 });
+            }
+
+            // Return the chat document with all messages
+            console.log(`Found conversation ${guruChat._id} with ${guruChat.messages?.length || 0} messages`);
+            return NextResponse.json({ success: true, data: guruChat }, { status: 200 });
+
         } else {
+
             // --- Fetch History Summary --- 
             console.log(`Fetching history summary for user ${userId}`);
             const chats = await Chat.find({ userId: userObjectId })
-                .sort({ updatedAt: -1 }) 
-                .populate({ path: 'guruId', select: 'name' }) 
-                .lean(); 
-            
+                .sort({ updatedAt: -1 })
+                .populate({ path: 'guruId', select: 'name' })
+                .lean();
+
             // --- 4. Process History (Group by Guru and create summaries) ---
             type ProcessedHistory = {
                 [guruId: string]: {
                     guruId: string;
                     guruName: string;
                     // Changed `chats` to `conversations` for clarity
-                    conversations: { 
+                    conversations: {
                         conversationId: string; // ID of the whole Chat document
                         summary: string; // e.g., first user message of the whole thread
                         lastUpdated: Date;
@@ -94,29 +120,29 @@ export async function GET(req: NextRequest) {
 
             // Since each document now represents a full conversation thread per guru,
             // the grouping logic simplifies. We just transform each fetched document.
-            for (const conversation of chats) { 
+            for (const conversation of chats) {
                 const guru = conversation.guruId as any; // Type assertion after populate
                 // If guruId is somehow missing despite filter (shouldn't happen with new save logic), skip
                 if (!guru?._id) {
-                     console.warn(`Skipping chat document ${conversation._id} with missing guruId during history processing.`);
-                     continue;
+                    console.warn(`Skipping chat document ${conversation._id} with missing guruId during history processing.`);
+                    continue;
                 }
                 const guruIdStr = guru._id.toString();
-                const guruName = guru.name || 'Unknown Guru'; 
+                const guruName = guru.name || 'Unknown Guru';
 
                 // Should only be one entry per guru now, but using this structure for consistency
                 if (!processedHistory[guruIdStr]) {
                     processedHistory[guruIdStr] = {
                         guruId: guruIdStr,
                         guruName: guruName,
-                        conversations: [], 
+                        conversations: [],
                     };
                 }
-                
+
                 // Summary based on the *first* user message in the entire conversation thread
                 const firstUserMessage = conversation.messages.find(m => m.role === 'user');
-                let summary = firstUserMessage 
-                    ? firstUserMessage.content.substring(0, 50) + (firstUserMessage.content.length > 50 ? '...' : '') 
+                let summary = firstUserMessage
+                    ? firstUserMessage.content.substring(0, 50) + (firstUserMessage.content.length > 50 ? '...' : '')
                     : 'Chat started';
                 if (!firstUserMessage) console.warn(`Conversation ${conversation._id} missing first user message for summary.`);
 
@@ -126,7 +152,7 @@ export async function GET(req: NextRequest) {
                     lastUpdated: conversation.updatedAt,
                 });
             }
-            
+
             const historyArray = Object.values(processedHistory);
 
             console.log('Processed history summary prepared:', JSON.stringify(historyArray, null, 2));
