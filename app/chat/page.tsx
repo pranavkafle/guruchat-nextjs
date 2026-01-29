@@ -395,10 +395,11 @@ function ChatInterface() {
                         onSubmit={handleChatSubmit}
                         className="w-full"
                     >
-                        <PromptInputFooter>
+                        <PromptInputFooter className="py-2">
                             <PromptInputTextarea
                                 placeholder="Ask your Guru anything..."
                                 disabled={isLoading || isLoadingChat}
+                                className="min-h-12 py-2"
                                 onChange={(e) => setPromptText(e.currentTarget.value)}
                             />
                             <PromptInputSubmit

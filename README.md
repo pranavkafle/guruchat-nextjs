@@ -4,7 +4,14 @@ This repository contains the Next.js version of the GuruChat application, implem
 
 ## Overview
 
-The application allows users to register, log in, and chat with different "Guru" personas powered by Google's Generative AI. Built as a full-stack Next.js application with API routes for the backend and React components for the frontend, leveraging MongoDB for data storage.
+The application allows users to register, log in, and chat with different "Guru" personas powered by Google's Generative AI. It is a full-stack Next.js app with API routes and a MongoDB backend, using TypeScript throughout.
+
+### UI & UX Highlights
+
+*   **Shadcn + Vercel AI Elements UI:** The chat experience uses AI Elements (Conversation, Message, Prompt Input) for native streaming UI and layout consistency.
+*   **Viewport-locked layout:** Header and sidebar are fixed within a full-height shell; only the content area scrolls (chat history and guru grid).
+*   **Chat history management:** Conversations are listed by Guru and can be deleted from the chat header with a confirmation dialog.
+*   **Typing indicator:** A lightweight “typing…” shimmer appears while the assistant is responding.
 
 ## Prerequisites
 
@@ -75,13 +82,20 @@ A basic API test script is included to verify backend functionality.
     ```
     The script will test registration, login, fetching gurus, and initiating a chat stream. It checks HTTP status codes and basic response structures.
 
-## Middleware Configuration Notes
+## Auth Gateway (proxy.ts)
 
-*   **Authentication Enforcement:** The `middleware.ts` file handles authentication checks for accessing application routes. It verifies a `jwt_token` cookie (which should be set via HttpOnly during login).
-*   **Behavior:**
-    *   Authenticated users attempting to access `/login` or `/register` are redirected to the homepage (`/`).
-    *   Unauthenticated users attempting to access any protected route (including `/`) are redirected to `/login`. Access is allowed only to the `/login`, `/register` pages and their corresponding API endpoints (`/api/auth/login`, `/api/auth/register`).
+Authentication checks are handled in `proxy.ts` rather than `middleware.ts`. It validates the `jwt_token` cookie (HttpOnly) and enforces access rules for protected routes.
+
+**Behavior:**
+*   Authenticated users attempting to access `/login` or `/register` are redirected to the homepage (`/`).
+*   Unauthenticated users attempting to access protected routes (including `/`) are redirected to `/login`. Access is allowed only to `/login`, `/register`, and their auth endpoints (`/api/auth/login`, `/api/auth/register`).
 
 ## Deployment
 
-This project is configured for easy deployment on Vercel. Connect your Git repository (GitHub, GitLab, Bitbucket) to Vercel and ensure the necessary environment variables (`MONGODB_URI`, `JWT_SECRET`, `GOOGLE_AI_API_KEY`) are configured in the Vercel project settings. Vercel will automatically detect the Next.js framework and build/deploy the application. 
+This project is configured for easy deployment on Vercel. Connect your Git repository (GitHub, GitLab, Bitbucket) to Vercel and ensure the necessary environment variables (`MONGODB_URI`, `JWT_SECRET`, `GOOGLE_AI_API_KEY`) are configured in the Vercel project settings. Vercel will automatically detect the Next.js framework and build/deploy the application.
+
+## API Endpoints (Selected)
+
+*   **POST `/api/chat`** — Streams model responses and persists conversation history.
+*   **GET `/api/chats`** — Fetch chat history grouped by Guru or a single conversation by `conversationId`.
+*   **DELETE `/api/chats?conversationId=...`** — Permanently deletes a conversation for the authenticated user.
